@@ -73,10 +73,11 @@ revision.
 
 `npm run platform:freshness` compares the contract with local Electron `DEPS`,
 upstream Electron main, the newest tagged Chromium build for the same major,
-and Chromium's live tip. It distinguishes a buildable tagged roll target from
-an untagged tip. It only writes a roll plan. Update Electron `DEPS`, sync and
-apply its Chromium patches, then run `npm run platform:update -- --reset-ledger`
-to accept a roll explicitly.
+and Chromium's live tip. A fork pin ahead of Electron main is current; a pin
+behind Electron main fails strict freshness. The checker distinguishes a
+buildable tagged roll target from an untagged tip and only writes a roll plan.
+Update Electron `DEPS`, sync and apply its Chromium patches, then run
+`npm run platform:update -- --reset-ledger` to accept a roll explicitly.
 
 ## Differential Chromium oracle
 
