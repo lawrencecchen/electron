@@ -1,0 +1,14 @@
+{
+  "name": "electron-webcontents-overlay-demo",
+  "private": true,
+  "version": "0.0.1",
+  "description": "Layered WebContentsView browser omnibar and overlay demo",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "smoke": "ELECTRON_OVERLAY_SMOKE=1 electron ."
+  },
+  "devDependencies": {
+    "electron": "43.0.0"
+  }
+}

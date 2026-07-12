@@ -1,0 +1,26 @@
+:root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+* { box-sizing: border-box; }
+body { margin: 0; }
+button, input { font: inherit; }
+.toolbar-body { background: #111827; }
+.toolbar { height: 64px; display: flex; align-items: center; gap: 8px; padding: 10px 16px; border-bottom: 1px solid #263244; }
+.toolbar button { width: 36px; height: 36px; border: 0; border-radius: 9px; color: #dbe4f0; background: #1f2937; cursor: pointer; }
+.toolbar button:disabled { opacity: .35; }
+.toolbar button:hover:not(:disabled), .toolbar button.active { background: #334155; }
+#address-form { flex: 1; height: 40px; display: flex; align-items: center; gap: 10px; border: 1px solid #334155; border-radius: 12px; padding: 0 13px; background: #0b1220; }
+#address { flex: 1; border: 0; outline: 0; color: #f8fafc; background: transparent; }
+#status { width: 8px; height: 8px; border-radius: 50%; background: #34d399; }
+#status.loading { background: #60a5fa; box-shadow: 0 0 0 5px rgb(96 165 250 / .12); }
+.toolbar .overlay-button { width: auto; padding: 0 15px; }
+.overlay-body { background: #0f172a; }
+.popover { height: 250px; padding: 18px; overflow: hidden; border: 1px solid #475569; color: #e5edf8; background: #0f172a; }
+.popover header { display: flex; align-items: flex-start; justify-content: space-between; }
+.popover h1 { margin: 2px 0 0; font-size: 20px; }
+.popover .eyebrow { color: #8b9bb0; font-size: 10px; font-weight: 700; letter-spacing: .13em; }
+.popover #close { width: 30px; height: 30px; border: 0; border-radius: 8px; color: #cbd5e1; background: #263244; cursor: pointer; }
+.popover p { color: #aebdd0; font-size: 13px; line-height: 1.45; }
+.popover label { display: grid; gap: 6px; color: #cbd5e1; font-size: 12px; }
+.popover input { width: 100%; border: 1px solid #475569; border-radius: 8px; padding: 9px 10px; color: #f8fafc; background: #111827; outline: 0; }
+.popover input:focus { border-color: #60a5fa; box-shadow: 0 0 0 3px rgb(96 165 250 / .18); }
+.proof { display: flex; align-items: center; gap: 8px; margin-top: 13px; color: #86efac; font-size: 12px; }
+.proof span { width: 8px; height: 8px; border-radius: 50%; background: #4ade80; box-shadow: 0 0 12px #4ade80; }
