@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "chromium": {
+    "version": "152.0.7925.0",
+    "revision": "743c625106f2622aca4eef5f2e717442a54a3687"
+  },
+  "repository": "https://chromium.googlesource.com/chromium/src",
+  "targetPlatforms": [
+    "linux",
+    "mac",
+    "win"
+  ],
+  "roots": [
+    "extensions/common/api",
+    "chrome/common/extensions/api"
+  ],
+  "schemaExtensions": [
+    ".json",
+    ".idl",
+    ".webidl"
+  ],
+  "featureFiles": {
+    "api": "_api_features",
+    "manifest": "_manifest_features",
+    "permission": "_permission_features",
+    "behavior": "_behavior_features"
+  },
+  "snapshot": "chromium-152.0.7925.0.json"
+}

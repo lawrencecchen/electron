@@ -2,7 +2,11 @@ const fs = require('node:fs/promises')
 const http = require('node:http')
 const path = require('node:path')
 const { app, BaseWindow, WebContentsView, ipcMain, session } = require('electron')
-const { ElectronChromeExtensions } = require('electron-chrome-extensions')
+const {
+  evaluateCoverage,
+  loadContract,
+  loadSupportLedger
+} = require('./scripts/platform-contract.cjs')
 
 const extensions = [
   { name: 'ublock', directory: 'ublock', popup: 'popup-fenix.html' },
@@ -31,6 +35,16 @@ process.on('warning', (warning) => {
 const root = __dirname
 const extensionRoot = path.join(root, 'fixtures', 'extensions')
 const artifacts = path.join(root, 'artifacts')
+const requiredAPI = require('./required-api.json')
+const platformContract = loadContract()
+const supportLedger = loadSupportLedger()
+const providerArgument = process.argv.find((argument) => argument.startsWith('--extension-provider='))?.split('=')[1]
+const extensionProviderMode = providerArgument || process.env.ELECTRON_EXTENSION_PROVIDER || 'native'
+const smokeMode = process.argv.includes('--smoke') || process.env.ELECTRON_EXTENSION_SMOKE === '1'
+
+if (!['native', 'shim'].includes(extensionProviderMode)) {
+  throw new Error(`Unknown extension provider: ${extensionProviderMode}`)
+}
 
 function emitState(extra = {}) {
   if (!toolbar || toolbar.webContents.isDestroyed()) return
@@ -162,11 +176,32 @@ async function inventoryChromeAPIs(webContents) {
   })()`)
 }
 
+async function checkRequiredAPIs(webContents, requirements) {
+  return webContents.executeJavaScript(`(() => {
+    const requirements = ${JSON.stringify(requirements)}
+    return requirements.map(path => {
+      let value = globalThis.chrome
+      for (const component of path.split('.')) value = value?.[component]
+      return { path, present: value !== undefined, type: typeof value }
+    })
+  })()`)
+}
+
 async function runSmoke() {
   await fs.mkdir(artifacts, { recursive: true })
   const report = {
     electron: process.versions.electron,
     chrome: process.versions.chrome,
+    platform: { darwin: 'mac', linux: 'linux', win32: 'win' }[process.platform] || process.platform,
+    provider: {
+      mode: extensionProviderMode,
+      nativeConformance: extensionProviderMode === 'native',
+      injectedAPIs: extensionProviderMode === 'shim' ? ['electron-chrome-extensions'] : []
+    },
+    platformContract: {
+      chromium: platformContract.chromium,
+      denominator: platformContract.summary
+    },
     fixtureURL,
     extensions: {},
     consoleEvents
@@ -186,13 +221,15 @@ async function runSmoke() {
       await fs.writeFile(path.join(artifacts, `${descriptor.name}-popup.png`), image.toPNG())
       Object.assign(report.extensions[descriptor.name], {
         popupURL: item.view.webContents.getURL(),
-        api: await inventoryChromeAPIs(item.view.webContents)
+        api: await inventoryChromeAPIs(item.view.webContents),
+        canaryRequirements: await checkRequiredAPIs(item.view.webContents, requiredAPI[descriptor.name])
       })
     } catch (error) {
       report.extensions[descriptor.name].error = error.stack || String(error)
     }
   }
   report.consoleEvents = consoleEvents
+  report.coverage = evaluateCoverage(platformContract, supportLedger, report)
   await fs.writeFile(path.join(artifacts, 'compatibility.json'), JSON.stringify(report, null, 2))
   app.exit(0)
 }
@@ -200,11 +237,14 @@ async function runSmoke() {
 async function createWindow() {
   await createFixtureServer()
   const ses = session.fromPartition('persist:extension-lab')
-  chromeExtensions = new ElectronChromeExtensions({
-    license: 'GPL-3.0',
-    session: ses,
-    requestPermissions: async () => true
-  })
+  if (extensionProviderMode === 'shim') {
+    const { ElectronChromeExtensions } = require('electron-chrome-extensions')
+    chromeExtensions = new ElectronChromeExtensions({
+      license: 'GPL-3.0',
+      session: ses,
+      requestPermissions: async () => true
+    })
+  }
   ses.extensions.on('extension-loaded', (_event, extension) => {
     consoleEvents.push({ time: new Date().toISOString(), event: 'extension-loaded', id: extension.id, name: extension.name })
   })
@@ -225,7 +265,7 @@ async function createWindow() {
   content.setBackgroundColor('#ffffff')
   attachDiagnostics('toolbar', toolbar.webContents)
   attachDiagnostics('content', content.webContents)
-  chromeExtensions.addTab(content.webContents, window)
+  chromeExtensions?.addTab(content.webContents, window)
   window.contentView.addChildView(content)
   window.contentView.addChildView(toolbar)
   await loadExtensions(ses)
@@ -246,7 +286,7 @@ async function createWindow() {
     window = undefined
   })
 
-  if (process.env.ELECTRON_EXTENSION_SMOKE === '1') await runSmoke()
+  if (smokeMode) await runSmoke()
 }
 
 ipcMain.on('lab:navigate', (_event, address) => content.webContents.loadURL(normalizeAddress(address)))

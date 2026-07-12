@@ -7,7 +7,15 @@
   "scripts": {
     "fetch-extensions": "node scripts/fetch-extensions.mjs",
     "start": "electron .",
-    "smoke": "ELECTRON_EXTENSION_SMOKE=1 electron ."
+    "start:shim": "electron . --extension-provider=shim",
+    "smoke": "electron . --smoke",
+    "smoke:shim": "electron . --smoke --extension-provider=shim",
+    "platform:update": "node scripts/generate-platform-contract.mjs",
+    "platform:check": "node scripts/check-platform-coverage.mjs",
+    "platform:check:linux": "node scripts/check-platform-coverage.mjs --platform linux --strict",
+    "platform:check:win": "node scripts/check-platform-coverage.mjs --platform win --strict",
+    "platform:check:strict": "node scripts/check-platform-coverage.mjs --strict",
+    "test:platform": "node scripts/test-platform-contract.mjs"
   },
   "devDependencies": {
     "adm-zip": "0.5.16",
