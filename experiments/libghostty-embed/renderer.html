@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Electron + libghostty</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+        background: #0b0d10;
+        color: #e8eaed;
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; min-height: 100vh; }
+      header {
+        height: 52px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 0 18px;
+        border-bottom: 1px solid #252a32;
+        background: #101318;
+      }
+      .status {
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
+        background: #63d297;
+        box-shadow: 0 0 12px #63d29788;
+      }
+      aside {
+        position: absolute;
+        top: 64px;
+        right: 16px;
+        bottom: 16px;
+        width: calc(38% - 24px);
+        min-width: 320px;
+        padding: 20px;
+        border: 1px solid #2c323c;
+        border-radius: 12px;
+        background: #141820;
+      }
+      h1 { margin: 0; font-size: 15px; font-weight: 650; }
+      h2 { margin: 0 0 12px; font-size: 13px; color: #9aa3b2; }
+      p { color: #b9c0ca; font-size: 14px; line-height: 1.55; }
+      button {
+        margin-top: 12px;
+        padding: 9px 12px;
+        border: 1px solid #3b4452;
+        border-radius: 8px;
+        background: #222936;
+        color: #edf1f7;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <span class="status"></span>
+      <h1>Native libghostty surface + Chromium UI</h1>
+    </header>
+    <aside>
+      <h2>CHROMIUM WEB CONTENT</h2>
+      <p>This panel is ordinary HTML. The terminal to the left is an AppKit NSView rendered by libghostty's Metal renderer.</p>
+      <button type="button" onclick="this.textContent = 'Chrome UI is interactive'">Test Chrome UI</button>
+    </aside>
+  </body>
+</html>
