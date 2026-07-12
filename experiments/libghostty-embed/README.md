@@ -33,6 +33,23 @@ colors. A normal Finder launch does not inherit the development harness value.
 Production work still needs IME marked text, accessibility, renderer health
 handling, full action routing, and lifecycle hardening.
 
+`npm run stress` repeatedly creates a real Ghostty app/surface, writes ANSI
+output, performs 40 native resizes, explicitly destroys it while callbacks are
+active, and repeats for 100 surfaces. It fails on renderer loss, an unresponsive
+window, or more than 64 MB of retained/peak working-set growth after ten warmup
+surfaces, and writes `artifacts/stress-0.json`. Change the workload with
+`npm run stress -- --stress-iterations=<n> --stress-resizes=<n>`.
+
+The addon exposes idempotent `destroy()` and drains queued wakeup callbacks
+before the N-API external is deleted. Window close calls `destroy()` directly,
+so native resources no longer depend on a later garbage-collection pass.
+
+`npm run stress:cycles` starts ten fresh Electron processes and creates 100
+Ghostty surfaces in each. It fails on a browser-process signal, nonzero exit,
+timeout, missing report, native/renderer failure, or retained-memory violation.
+Use `npm run stress:cycles -- --cycles=<n> --iterations=<n> --resizes=<n>` to
+change the process and surface counts.
+
 ## Platform result
 
 macOS is viable now. Electron exposes an `NSView*`, and libghostty accepts an
