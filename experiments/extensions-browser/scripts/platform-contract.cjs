@@ -12,6 +12,18 @@ function loadSourceManifest() {
   return readJSON(path.join(root, 'platform', 'source-manifest.json'))
 }
 
+function parseElectronChromiumVersion(value, source = 'Electron DEPS') {
+  const match = value.match(/['"]chromium_version['"]\s*:\s*\n?\s*['"]([^'"]+)['"]/)
+  if (!match) throw new Error(`Unable to find chromium_version in ${source}`)
+  return match[1]
+}
+
+function loadElectronChromiumVersion() {
+  const sourceManifest = loadSourceManifest()
+  const depsPath = path.resolve(root, sourceManifest.electronDeps)
+  return parseElectronChromiumVersion(fs.readFileSync(depsPath, 'utf8'), depsPath)
+}
+
 function loadContract() {
   const sourceManifest = loadSourceManifest()
   return readJSON(path.join(root, 'platform', sourceManifest.snapshot))
@@ -350,10 +362,11 @@ function evidenceSummary(contract, ledger, key, platform) {
   const ledgerKey = `${key}Features`
   const evidence = ledger[ledgerKey] || {}
   const applies = (entry) => Array.isArray(entry?.platforms) && entry.platforms.includes(platform)
-  const supported = contractNames.filter((name) => applies(evidence[name]) && evidence[name].status === 'supported' && Array.isArray(evidence[name].tests) && evidence[name].tests.length > 0)
+  const valid = (entry) => entry?.coverage === 'complete' && Array.isArray(entry.tests) && entry.tests.length > 0
+  const supported = contractNames.filter((name) => applies(evidence[name]) && evidence[name].status === 'supported' && valid(evidence[name]))
   const failing = contractNames.filter((name) => applies(evidence[name]) && evidence[name].status === 'failing')
   const unverified = contractNames.filter((name) => !applies(evidence[name]) || !['supported', 'failing'].includes(evidence[name].status))
-  const invalid = contractNames.filter((name) => applies(evidence[name]) && evidence[name].status === 'supported' && (!Array.isArray(evidence[name].tests) || evidence[name].tests.length === 0))
+  const invalid = contractNames.filter((name) => applies(evidence[name]) && evidence[name].status === 'supported' && !valid(evidence[name]))
   return { total: contractNames.length, supported, failing, invalid, unverified: uniqueSorted([...unverified, ...invalid]) }
 }
 
@@ -407,7 +420,7 @@ function conformanceFailures(coverage) {
   }
   if (coverage.provider?.mode !== 'native') failures.push('provider mode is not native')
   for (const [kind, result] of Object.entries(coverage.conformanceEvidence)) {
-    if (result.invalid.length) failures.push(`${kind}: ${result.invalid.length} supported claim(s) have no test evidence`)
+    if (result.invalid.length) failures.push(`${kind}: ${result.invalid.length} supported claim(s) lack complete test evidence`)
     if (result.failing.length) failures.push(`${kind}: ${result.failing.length} failing feature(s)`)
     if (result.unverified.length) failures.push(`${kind}: ${result.unverified.length} unverified feature(s)`)
   }
@@ -421,9 +434,11 @@ module.exports = {
   evaluateCoverage,
   featureNamesForPlatform,
   loadContract,
+  loadElectronChromiumVersion,
   loadSourceManifest,
   loadSupportLedger,
   parseJSONC,
+  parseElectronChromiumVersion,
   parseSchema,
   root,
   sha256

@@ -1,516 +1,339 @@
-import crypto from 'node:crypto'
 import fs from 'node:fs/promises'
+import http from 'node:http'
 import path from 'node:path'
 import { spawn, spawnSync } from 'node:child_process'
-import { once } from 'node:events'
-import { fileURLToPath } from 'node:url'
+import { createRequire } from 'node:module'
 
-const scriptPath = fileURLToPath(import.meta.url)
-const root = path.resolve(path.dirname(scriptPath), '..')
-const electronRoot = path.resolve(root, '..', '..')
-const probeRoot = path.join(root, 'oracle-probe')
-const probeManifest = JSON.parse(await fs.readFile(path.join(probeRoot, 'manifest.json'), 'utf8'))
-const oracleFeatures = ['Webium', 'SurfaceEmbed', 'ExtensionsMenuAccessControl']
-const fixtureNames = ['ublock', 'bitwarden']
-const webuiBrowserURL = 'chrome://webui-browser/'
+const require = createRequire(import.meta.url)
+const { generateProbeFixtures, root } = require('./oracle-contract.cjs')
+const { behaviorDifferences, surfaceDifference } = require('./oracle-diff.cjs')
+const { loadContract } = require('./platform-contract.cjs')
+const args = process.argv.slice(2)
 
-function fail(message) {
-  throw new Error(message)
+function option(name, fallback) {
+  const direct = args.find((argument) => argument.startsWith(`${name}=`))
+  if (direct) return direct.slice(name.length + 1)
+  const index = args.indexOf(name)
+  return index === -1 ? fallback : args[index + 1]
 }
 
-function sha256(value) {
-  return crypto.createHash('sha256').update(value).digest('hex')
+const chromiumBinary = option('--chromium-binary')
+if (!chromiumBinary) throw new Error('--chromium-binary is required')
+const electronBinary = option('--electron-binary', require('electron'))
+const platform = option('--platform', { darwin: 'mac', linux: 'linux', win32: 'win' }[process.platform])
+const timeoutMs = Number(option('--timeout-ms', '20000'))
+const headed = args.includes('--headed')
+const noSandbox = args.includes('--no-sandbox')
+const allowVersionMismatch = args.includes('--allow-version-mismatch')
+const output = path.resolve(option('--output', path.join(root, 'artifacts', 'chromium-oracle.json')))
+const generatedRoot = path.resolve(option('--fixture-root', path.join(root, '.generated', 'oracle-probes')))
+const profileRoot = path.join(root, '.generated', 'oracle-profiles', `${Date.now()}-${process.pid}`)
+const contract = loadContract()
+
+function chromeVersion(value) {
+  return value?.match(/(?:Chrome|Chromium)\/(\d+\.\d+\.\d+\.\d+)/)?.[1] ||
+    value?.match(/(?:Chrome|Chromium)(?: for Testing)?\s+(\d+\.\d+\.\d+\.\d+)/)?.[1]
 }
 
-export function extensionIdFromKey(key) {
-  const digest = sha256(Buffer.from(key, 'base64')).slice(0, 32)
-  return [...digest].map((digit) => String.fromCharCode(97 + Number.parseInt(digit, 16))).join('')
+function binaryVersion(binary) {
+  const result = spawnSync(binary, ['--version'], { encoding: 'utf8' })
+  return { status: result.status, output: `${result.stdout || ''}${result.stderr || ''}`.trim() }
 }
 
-const probeId = extensionIdFromKey(probeManifest.key)
-const probeURL = `chrome-extension://${probeId}/report.html`
-
-export function canonicalJSONString(value) {
-  if (value === undefined) return 'null'
-  if (Array.isArray(value)) return `[${value.map((item) => canonicalJSONString(item)).join(',')}]`
-  if (value && typeof value === 'object') {
-    const keys = Object.keys(value).filter((key) => value[key] !== undefined).sort()
-    return `{${keys.map((key) => `${JSON.stringify(key)}:${canonicalJSONString(value[key])}`).join(',')}}`
-  }
-  return JSON.stringify(value)
-}
-
-export function parseDevToolsActivePort(value) {
-  const [portText, browserPath] = value.trim().split(/\r?\n/)
-  const port = Number.parseInt(portText, 10)
-  if (!Number.isInteger(port) || port <= 0 || port > 65535) fail('DevToolsActivePort contains an invalid port')
-  if (!browserPath?.startsWith('/devtools/browser/')) fail('DevToolsActivePort contains an invalid browser endpoint')
-  return { browserPath, port }
-}
-
-export function decodeProbeTitle(title) {
-  const match = title.match(/ORACLE_(READY|ERROR):([A-Za-z0-9+/=]+)/)
-  if (!match) return undefined
-  return {
-    status: match[1].toLowerCase(),
-    value: JSON.parse(Buffer.from(match[2], 'base64').toString('utf8'))
-  }
-}
-
-export function parseBrowserRevision(value) {
-  const revision = value?.replace(/^@/, '')
-  if (!revision || !/^[a-f0-9]{40}$/.test(revision)) fail(`Chrome reported an invalid source revision: ${value}`)
-  return revision
-}
-
-export function matchFixtures(fixtures, extensions) {
-  return fixtures.map((fixture) => {
-    const candidates = extensions.filter((extension) => {
-      if (fixture.expectedId) return extension.id === fixture.expectedId
-      return extension.name === fixture.displayName && extension.version === fixture.version
-    })
-    const status = candidates.length === 1 ? 'loaded' : candidates.length ? 'ambiguous' : 'not-loaded'
-    const extension = candidates.length === 1 ? candidates[0] : undefined
-    return {
-      displayName: fixture.displayName,
-      enabled: extension?.enabled,
-      id: extension?.id,
-      installType: extension?.installType,
-      label: fixture.label,
-      requested: true,
-      status,
-      type: extension?.type,
-      version: fixture.version
+function ordinaryPage(collectorURL) {
+  return `<!doctype html><meta charset="utf-8"><title>Chromium oracle ordinary page</title><script>
+  (() => {
+    const namespaces = Object.keys(globalThis.chrome || {}).sort()
+    const members = {}
+    for (const namespace of namespaces) {
+      members[namespace] = {}
+      try {
+        for (const member of Object.keys(chrome[namespace] || {}).sort()) {
+          try { members[namespace][member] = typeof chrome[namespace][member] }
+          catch (error) { members[namespace][member] = '<error:' + error.message + '>' }
+        }
+      } catch (error) { members[namespace].__error = error.message }
     }
+    const hasPrivilegedRuntime = Boolean(globalThis.chrome && chrome.runtime && chrome.runtime.id)
+    fetch(${JSON.stringify(collectorURL)} + '/report', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        context: 'ordinary_page', manifestVersion: null, userAgent: navigator.userAgent,
+        surface: { namespaces, members },
+        behavior: [{ id: 'ordinary.noPrivilegedRuntime', feature: null, status: hasPrivilegedRuntime ? 'fail' : 'pass' }]
+      })
+    })
+  })()
+  </script>`
+}
+
+function createCollector() {
+  const reports = { chromium: new Map(), electron: new Map() }
+  let activeEngine
+  let pageHTML = ''
+  const server = http.createServer(async (request, response) => {
+    response.setHeader('access-control-allow-origin', '*')
+    response.setHeader('access-control-allow-headers', 'content-type')
+    if (request.method === 'OPTIONS') {
+      response.writeHead(204)
+      response.end()
+      return
+    }
+    if (request.url === '/page') {
+      response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' })
+      response.end(pageHTML)
+      return
+    }
+    if (request.url === '/report' && request.method === 'POST') {
+      const chunks = []
+      let size = 0
+      for await (const chunk of request) {
+        size += chunk.length
+        if (size > 8 * 1024 * 1024) {
+          response.writeHead(413)
+          response.end()
+          return
+        }
+        chunks.push(chunk)
+      }
+      try {
+        const payload = JSON.parse(Buffer.concat(chunks).toString('utf8'))
+        if (!activeEngine || !reports[activeEngine]) throw new Error('no active engine')
+        reports[activeEngine].set(payload.context, { ...payload, receivedAt: new Date().toISOString() })
+        response.writeHead(204)
+      } catch (error) {
+        response.writeHead(400, { 'content-type': 'text/plain' })
+        response.end(error.message)
+        return
+      }
+      response.end()
+      return
+    }
+    response.writeHead(404)
+    response.end()
+  })
+  return new Promise((resolve, reject) => {
+    server.once('error', reject)
+    server.listen(0, '127.0.0.1', () => {
+      const url = `http://127.0.0.1:${server.address().port}`
+      pageHTML = ordinaryPage(url)
+      resolve({
+        url,
+        reports,
+        setActiveEngine: (engine) => { activeEngine = engine },
+        close: () => new Promise((done) => server.close(done))
+      })
+    })
   })
 }
 
-function parseOptions(args) {
-  const options = { chromeArgs: [] }
-  const valueOptions = new Map([
-    ['--chrome', 'chrome'],
-    ['--chromium-root', 'chromiumRoot'],
-    ['--out-dir', 'outDir'],
-    ['--profile-dir', 'profileDir'],
-    ['--metadata', 'metadata'],
-    ['--url', 'url'],
-    ['--startup-timeout-ms', 'startupTimeout']
+function launch(binary, launchArgs) {
+  const child = spawn(binary, launchArgs, { stdio: ['ignore', 'pipe', 'pipe'] })
+  const output = []
+  for (const stream of [child.stdout, child.stderr]) {
+    stream.on('data', (chunk) => {
+      output.push(chunk.toString())
+      if (output.join('').length > 2_000_000) output.shift()
+    })
+  }
+  return { child, output }
+}
+
+async function stopProcess(child) {
+  if (child.exitCode !== null || child.signalCode !== null) return
+  if (process.platform === 'win32') {
+    spawnSync('taskkill', ['/pid', String(child.pid), '/t', '/f'])
+    return
+  }
+  child.kill('SIGTERM')
+  await Promise.race([
+    new Promise((resolve) => child.once('exit', resolve)),
+    new Promise((resolve) => setTimeout(resolve, 2000))
   ])
-  for (let index = 0; index < args.length; index += 1) {
-    const argument = args[index]
-    if (valueOptions.has(argument)) {
-      const value = args[index + 1]
-      if (!value || value.startsWith('--')) fail(`${argument} requires a value`)
-      options[valueOptions.get(argument)] = value
-      index += 1
-    } else if (argument === '--chrome-arg') {
-      const value = args[index + 1]
-      if (!value) fail('--chrome-arg requires a value')
-      options.chromeArgs.push(value)
-      index += 1
-    } else if (argument === '--exit-after-ready') {
-      options.exitAfterReady = true
-    } else if (argument === '--print-command') {
-      options.printCommand = true
-    } else if (argument === '--reuse-profile') {
-      options.reuseProfile = true
-    } else if (argument === '--allow-patched-source') {
-      options.allowPatchedSource = true
-    } else if (argument === '--help') {
-      options.help = true
-    } else {
-      fail(`unknown argument: ${argument}`)
-    }
-  }
-  return options
+  if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL')
 }
 
-function usage() {
-  return `Usage: node scripts/run-chromium-oracle.mjs [options]
-
-  --chromium-root <src>       Chromium src checkout containing chrome/
-  --out-dir <directory>       GN output directory, default out/ChromeOracle
-  --chrome <executable>       Override the chrome binary path
-  --profile-dir <directory>   Dedicated user-data directory
-  --metadata <file>           Startup metadata output path
-  --url <url>                 Initial content URL
-  --chrome-arg <argument>     Additional Chrome argument, repeatable
-  --reuse-profile             Preserve the dedicated profile before launch
-  --allow-patched-source      Permit Electron patch commits for a non-oracle smoke run
-  --exit-after-ready          Stop Chrome after verified metadata is written
-  --print-command             Print the resolved launch command without running it
-`
-}
-
-async function isDirectory(directory) {
-  try {
-    return (await fs.stat(directory)).isDirectory()
-  } catch {
-    return false
-  }
-}
-
-async function resolveChromiumRoot(value) {
-  const candidates = [value, process.env.CHROMIUM_SRC, path.resolve(electronRoot, '..')].filter(Boolean)
-  for (const candidate of candidates) {
-    const resolved = path.resolve(candidate)
-    if (await isDirectory(path.join(resolved, 'chrome', 'browser'))) return resolved
-  }
-  fail('Chromium src was not found. Pass --chromium-root or set CHROMIUM_SRC.')
-}
-
-function defaultChromePath(outDir) {
-  if (process.platform === 'win32') return path.join(outDir, 'chrome.exe')
-  if (process.platform === 'darwin') return path.join(outDir, 'Chromium.app', 'Contents', 'MacOS', 'Chromium')
-  return path.join(outDir, 'chrome')
-}
-
-function runGit(chromiumRoot, args, allowFailure = false) {
-  const result = spawnSync('git', args, { cwd: chromiumRoot, encoding: 'utf8' })
-  if (!allowFailure && result.status !== 0) fail(`git ${args.join(' ')} failed: ${(result.stderr || '').trim()}`)
-  return result
-}
-
-function readChromiumVersion(deps) {
-  const match = deps.match(/'chromium_version'\s*:\s*\n?\s*'([^']+)'/)
-  if (!match) fail('Electron DEPS does not contain chromium_version')
-  return match[1]
-}
-
-async function hashDirectory(directory) {
-  const files = []
-  async function visit(current, prefix = '') {
-    const entries = await fs.readdir(current, { withFileTypes: true })
-    for (const entry of entries.sort((left, right) => left.name.localeCompare(right.name))) {
-      const relative = prefix ? `${prefix}/${entry.name}` : entry.name
-      const absolute = path.join(current, entry.name)
-      if (entry.isDirectory()) await visit(absolute, relative)
-      else if (entry.isFile()) files.push({ absolute, relative })
-      else fail(`fixture contains an unsupported filesystem entry: ${absolute}`)
-    }
-  }
-  await visit(directory)
-  const hash = crypto.createHash('sha256')
-  for (const file of files) {
-    const content = await fs.readFile(file.absolute)
-    hash.update(file.relative)
-    hash.update('\0')
-    hash.update(String(content.length))
-    hash.update('\0')
-    hash.update(content)
-    hash.update('\0')
-  }
-  return { files: files.length, sha256: hash.digest('hex') }
-}
-
-async function localizedManifestName(directory, manifest) {
-  const match = manifest.name?.match(/^__MSG_(.+)__$/)
-  if (!match) return manifest.name
-  if (!manifest.default_locale) fail(`${directory} uses a localized name without default_locale`)
-  const messagesPath = path.join(directory, '_locales', manifest.default_locale, 'messages.json')
-  const messages = JSON.parse(await fs.readFile(messagesPath, 'utf8'))
-  const message = messages[match[1]]?.message
-  if (!message) fail(`${messagesPath} does not define ${match[1]}`)
-  return message
-}
-
-async function readExtension(directory, label) {
-  const manifest = JSON.parse(await fs.readFile(path.join(directory, 'manifest.json'), 'utf8'))
-  const tree = await hashDirectory(directory)
-  return {
-    directory,
-    displayName: await localizedManifestName(directory, manifest),
-    expectedId: manifest.key ? extensionIdFromKey(manifest.key) : undefined,
-    label,
-    manifestVersion: manifest.manifest_version,
-    tree,
-    version: manifest.version
-  }
-}
-
-async function readJSON(file) {
-  return JSON.parse(await fs.readFile(file, 'utf8'))
-}
-
-async function waitForFile(file, child, deadline) {
+async function waitForReports(engineReports, expected, child) {
+  const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
-    if (child.exitCode !== null) fail(`Chrome exited before startup with code ${child.exitCode}`)
+    if (expected.every((context) => engineReports.has(context))) break
+    if (child.exitCode !== null || child.signalCode !== null) break
+    await new Promise((resolve) => setTimeout(resolve, 100))
+  }
+  return expected.filter((context) => !engineReports.has(context))
+}
+
+async function waitForDevToolsPort(profile, child) {
+  const file = path.join(profile, 'DevToolsActivePort')
+  const deadline = Date.now() + 5000
+  while (Date.now() < deadline) {
+    if (child.exitCode !== null || child.signalCode !== null) throw new Error('Chromium exited before DevTools started')
     try {
-      return await fs.readFile(file, 'utf8')
+      const [port] = (await fs.readFile(file, 'utf8')).split(/\r?\n/)
+      if (/^\d+$/.test(port)) return Number(port)
+    } catch {}
+    await new Promise((resolve) => setTimeout(resolve, 50))
+  }
+  throw new Error('Timed out waiting for Chromium DevToolsActivePort')
+}
+
+async function openChromeTarget(port, url) {
+  let lastError
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    try {
+      const response = await fetch(`http://127.0.0.1:${port}/json/new?${encodeURIComponent(url)}`, { method: 'PUT' })
+      if (response.ok) return
+      lastError = new Error(`${response.status} ${await response.text()}`)
     } catch (error) {
-      if (error.code !== 'ENOENT') throw error
+      lastError = error
     }
     await new Promise((resolve) => setTimeout(resolve, 100))
   }
-  fail(`timed out waiting for ${file}`)
+  throw new Error(`Unable to open Chromium target ${url}: ${lastError?.message}`)
 }
 
-async function fetchJSON(url) {
-  const response = await fetch(url, { signal: AbortSignal.timeout(2_000) })
-  if (!response.ok) fail(`${url} returned ${response.status}`)
-  return response.json()
+const preflight = {
+  chromium: binaryVersion(chromiumBinary),
+  electron: binaryVersion(electronBinary)
+}
+const suppliedChromiumVersion = chromeVersion(preflight.chromium.output)
+if (!allowVersionMismatch && suppliedChromiumVersion !== contract.chromium.version) {
+  throw new Error(`Chromium oracle ${suppliedChromiumVersion || preflight.chromium.output} does not match Electron DEPS ${contract.chromium.version}`)
 }
 
-async function browserVersionFromCDP(webSocketURL) {
-  return new Promise((resolve, reject) => {
-    const socket = new WebSocket(webSocketURL)
-    const timer = setTimeout(() => {
-      socket.close()
-      reject(new Error('Browser.getVersion timed out'))
-    }, 5_000)
-    socket.addEventListener('open', () => {
-      socket.send(JSON.stringify({ id: 1, method: 'Browser.getVersion' }))
-    })
-    socket.addEventListener('message', (event) => {
-      const message = JSON.parse(event.data)
-      if (message.id !== 1) return
-      clearTimeout(timer)
-      socket.close()
-      if (message.error) reject(new Error(`Browser.getVersion failed: ${message.error.message}`))
-      else resolve(message.result)
-    })
-    socket.addEventListener('error', () => {
-      clearTimeout(timer)
-      reject(new Error('Browser.getVersion WebSocket failed'))
-    })
-  })
-}
+await fs.mkdir(path.dirname(output), { recursive: true })
+await fs.mkdir(profileRoot, { recursive: true })
+const collector = await createCollector()
+const matrix = await generateProbeFixtures(generatedRoot, { contract, platform, collectorURL: collector.url })
+const expected = Object.keys(matrix.contexts).sort()
+const extensionPaths = [path.join(generatedRoot, 'mv2'), path.join(generatedRoot, 'mv3')]
+const extensionURLs = [2, 3].flatMap((manifestVersion) => {
+  const id = matrix.extensionIds[`mv${manifestVersion}`]
+  return [
+    `chrome-extension://${id}/probe.html?context=mv${manifestVersion}_extension_page`,
+    `chrome-extension://${id}/probe.html?context=mv${manifestVersion}_popup`
+  ]
+})
+const engines = {}
+const runningProcesses = []
 
-async function waitForTargets(port, child, deadline) {
-  let lastTargets = []
-  while (Date.now() < deadline) {
-    if (child.exitCode !== null) fail(`Chrome exited during startup with code ${child.exitCode}`)
-    try {
-      lastTargets = await fetchJSON(`http://127.0.0.1:${port}/json/list`)
-      const webuiTarget = lastTargets.find((target) => target.url === webuiBrowserURL)
-      const reportTarget = lastTargets.find((target) => target.url === probeURL)
-      const report = reportTarget && decodeProbeTitle(reportTarget.title)
-      if (report?.status === 'error') fail(`oracle probe failed: ${report.value.message}`)
-      if (webuiTarget && report?.status === 'ready') return { report: report.value, reportTarget, targets: lastTargets, webuiTarget }
-    } catch (error) {
-      if (!['AbortError', 'TimeoutError'].includes(error.name) && !/fetch failed|ECONNREFUSED/.test(error.message)) throw error
-    }
-    await new Promise((resolve) => setTimeout(resolve, 150))
-  }
-  const urls = lastTargets.map((target) => target.url).sort()
-  fail(`timed out waiting for Webium and the extension probe; observed targets: ${JSON.stringify(urls)}`)
-}
-
-async function gnArguments(chromiumRoot, outDir) {
-  const argsFile = path.join(outDir, 'args.gn')
-  const argsFileContent = await fs.readFile(argsFile, 'utf8')
-  const resolved = spawnSync('gn', ['args', outDir, '--list', '--short'], {
-    cwd: chromiumRoot,
-    encoding: 'utf8'
-  })
-  if (resolved.status === 0) {
-    const content = resolved.stdout.trim()
-    return { content, mode: 'resolved', sha256: sha256(content) }
-  }
-  return { content: argsFileContent.trim(), mode: 'args-file', sha256: sha256(argsFileContent.trim()) }
-}
-
-async function stopChrome(child) {
-  if (child.exitCode !== null) return
-  child.kill('SIGTERM')
-  await Promise.race([
-    once(child, 'exit'),
-    new Promise((resolve) => setTimeout(resolve, 5_000))
-  ])
-  if (child.exitCode === null) {
-    child.kill('SIGKILL')
-    await once(child, 'exit')
-  }
-}
-
-function normalizedTargets(targets) {
-  return targets.map((target) => ({
-    title: target.title,
-    type: target.type,
-    url: target.url
-  })).sort((left, right) => `${left.type}\0${left.url}\0${left.title}`.localeCompare(`${right.type}\0${right.url}\0${right.title}`))
-}
-
-async function main() {
-  const options = parseOptions(process.argv.slice(2))
-  if (options.help) {
-    console.log(usage())
-    return
-  }
-
-  const chromiumRoot = await resolveChromiumRoot(options.chromiumRoot)
-  const outDir = path.resolve(chromiumRoot, options.outDir || path.join('out', 'ChromeOracle'))
-  const chrome = path.resolve(options.chrome || defaultChromePath(outDir))
-  const profileDir = path.resolve(options.profileDir || path.join(root, 'artifacts', 'chromium-oracle-profile'))
-  const metadataPath = path.resolve(options.metadata || path.join(root, 'artifacts', 'chromium-oracle-startup.json'))
-  const contentURL = options.url || 'https://example.com/'
-  const fixturesRoot = path.join(root, 'fixtures', 'extensions')
-  const fixtures = await Promise.all(fixtureNames.map((name) => readExtension(path.join(fixturesRoot, name), name)))
-  const probe = await readExtension(probeRoot, 'oracle-probe')
-  if (probe.expectedId !== probeId) fail('oracle probe ID does not match its manifest key')
-
-  await fs.access(chrome)
-  for (const extension of [...fixtures, probe]) {
-    if (extension.directory.includes(',')) fail(`Chrome cannot load an extension path containing a comma: ${extension.directory}`)
-  }
-
-  const launchArguments = [
-    `--user-data-dir=${profileDir}`,
-    '--remote-debugging-port=0',
+try {
+  collector.setActiveEngine('chromium')
+  const chromiumProfile = path.join(profileRoot, 'chromium')
+  const chromium = launch(chromiumBinary, [
+    `--user-data-dir=${chromiumProfile}`,
     '--no-first-run',
     '--no-default-browser-check',
-    `--enable-features=${oracleFeatures.join(',')}`,
-    `--load-extension=${[...fixtures, probe].map((extension) => extension.directory).join(',')}`,
-    '--new-window',
-    contentURL,
-    probeURL,
-    ...options.chromeArgs
-  ]
-
-  if (options.printCommand) {
-    console.log(JSON.stringify({ arguments: launchArguments, chrome }, null, 2))
-    return
+    '--disable-background-networking',
+    '--disable-component-update',
+    '--disable-sync',
+    '--allow-legacy-extension-manifests',
+    '--remote-debugging-port=0',
+    `--disable-extensions-except=${extensionPaths.join(',')}`,
+    `--load-extension=${extensionPaths.join(',')}`,
+    '--disable-features=ExtensionManifestV2Disabled,ExtensionManifestV2Unsupported',
+    ...(noSandbox ? ['--no-sandbox'] : []),
+    ...(headed ? [] : ['--headless=new']),
+    `${collector.url}/page`
+  ])
+  runningProcesses.push(chromium.child)
+  const devToolsPort = await waitForDevToolsPort(chromiumProfile, chromium.child)
+  for (const url of extensionURLs) await openChromeTarget(devToolsPort, url)
+  const chromiumMissing = await waitForReports(collector.reports.chromium, expected, chromium.child)
+  await stopProcess(chromium.child)
+  engines.chromium = {
+    command: chromiumBinary,
+    versionOutput: preflight.chromium.output,
+    exitCode: chromium.child.exitCode,
+    missingContexts: chromiumMissing,
+    output: chromium.output.join('')
   }
 
-  if (!options.reuseProfile) await fs.rm(profileDir, { force: true, recursive: true })
-  await fs.mkdir(profileDir, { recursive: true })
-  await fs.mkdir(path.dirname(metadataPath), { recursive: true })
-
-  const sourceManifest = await readJSON(path.join(root, 'platform', 'source-manifest.json'))
-  const contractPath = path.join(root, 'platform', sourceManifest.snapshot)
-  const contractContent = await fs.readFile(contractPath, 'utf8')
-  const contract = JSON.parse(contractContent)
-  const deps = await fs.readFile(path.join(electronRoot, 'DEPS'), 'utf8')
-  const depsVersion = readChromiumVersion(deps)
-  if (sourceManifest.chromium.version !== depsVersion) {
-    fail(`contract Chromium ${sourceManifest.chromium.version} differs from Electron DEPS ${depsVersion}`)
+  collector.setActiveEngine('electron')
+  const electron = launch(electronBinary, [
+    ...(noSandbox ? ['--no-sandbox'] : []),
+    path.join(root, 'scripts', 'oracle-electron-main.cjs'),
+    `--fixture-root=${generatedRoot}`,
+    `--matrix=${path.join(generatedRoot, 'matrix.json')}`,
+    `--page-url=${collector.url}/page`,
+    `--user-data-dir=${path.join(profileRoot, 'electron')}`
+  ])
+  runningProcesses.push(electron.child)
+  const electronMissing = await waitForReports(collector.reports.electron, expected, electron.child)
+  await stopProcess(electron.child)
+  engines.electron = {
+    command: electronBinary,
+    versionOutput: preflight.electron.output,
+    exitCode: electron.child.exitCode,
+    missingContexts: electronMissing,
+    output: electron.output.join('')
   }
-  if (contract.chromium.version !== sourceManifest.chromium.version ||
-      contract.chromium.revision !== sourceManifest.chromium.revision) {
-    fail('generated conformance contract differs from platform/source-manifest.json')
+} finally {
+  await Promise.all(runningProcesses.map(stopProcess))
+  await collector.close()
+  await fs.rm(profileRoot, { recursive: true, force: true })
+}
+
+const reports = Object.fromEntries(Object.entries(collector.reports).map(([engine, contexts]) => [engine, Object.fromEntries(contexts)]))
+const observedVersions = {
+  chromium: suppliedChromiumVersion,
+  electron: chromeVersion(Object.values(reports.electron)[0]?.userAgent)
+}
+const pinnedVersions = observedVersions.chromium === contract.chromium.version && observedVersions.electron === contract.chromium.version
+const differences = {}
+const ledgerEvidenceCandidates = []
+for (const context of expected) {
+  const chromium = reports.chromium[context]
+  const electron = reports.electron[context]
+  const behavior = behaviorDifferences(chromium, electron, pinnedVersions)
+  differences[context] = {
+    missing: { chromium: !chromium, electron: !electron },
+    comparable: Boolean(chromium && electron),
+    surface: surfaceDifference(chromium, electron),
+    behavior
   }
-
-  const expectedRevision = sourceManifest.chromium.revision
-  const ancestor = runGit(chromiumRoot, ['merge-base', '--is-ancestor', expectedRevision, 'HEAD'], true)
-  if (ancestor.status !== 0) fail(`Chromium checkout does not descend from ${expectedRevision} (${depsVersion})`)
-  const sourceHead = runGit(chromiumRoot, ['rev-parse', 'HEAD']).stdout.trim()
-  const commitsAfterPin = Number.parseInt(runGit(chromiumRoot, ['rev-list', '--count', `${expectedRevision}..HEAD`]).stdout.trim(), 10)
-  const sourceDirty = runGit(chromiumRoot, ['status', '--porcelain']).stdout.trim() !== ''
-  const stockSource = sourceHead === expectedRevision && !sourceDirty
-  if (!stockSource && !options.allowPatchedSource) {
-    fail(`exact oracle requires clean Chromium ${expectedRevision}; pass --allow-patched-source only for an architectural smoke run`)
-  }
-  const electronHead = runGit(electronRoot, ['rev-parse', 'HEAD']).stdout.trim()
-  const gn = await gnArguments(chromiumRoot, outDir)
-
-  let child
-  try {
-    child = spawn(chrome, launchArguments, { stdio: 'inherit' })
-    const timeout = Number.parseInt(options.startupTimeout || '45000', 10)
-    if (!Number.isInteger(timeout) || timeout < 1_000) fail('--startup-timeout-ms must be an integer of at least 1000')
-    const deadline = Date.now() + timeout
-    const activePortText = await waitForFile(path.join(profileDir, 'DevToolsActivePort'), child, deadline)
-    const devtools = parseDevToolsActivePort(activePortText)
-    const version = await fetchJSON(`http://127.0.0.1:${devtools.port}/json/version`)
-    const browserWebSocketURL = `ws://127.0.0.1:${devtools.port}${devtools.browserPath}`
-    const cdpVersion = await browserVersionFromCDP(browserWebSocketURL)
-    const actualVersion = version.Browser?.match(/\/([0-9]+(?:\.[0-9]+){3})$/)?.[1]
-    if (actualVersion !== depsVersion) fail(`Chrome binary is ${actualVersion || version.Browser}; expected ${depsVersion}`)
-    const actualRevision = parseBrowserRevision(cdpVersion.revision)
-    if (stockSource && actualRevision !== expectedRevision) {
-      fail(`Chrome binary revision is ${actualRevision}; exact oracle requires ${expectedRevision}`)
-    }
-    const targetState = await waitForTargets(devtools.port, child, deadline)
-    const fixtureResults = matchFixtures(fixtures, targetState.report.extensions)
-    const requestedExtensions = [...fixtures, probe].map((extension) => ({
-      displayName: extension.displayName,
-      files: extension.tree.files,
-      label: extension.label,
-      manifestVersion: extension.manifestVersion,
-      sha256: extension.tree.sha256,
-      version: extension.version
-    }))
-    const comparable = {
-      build: {
-        gnArguments: gn.content,
-        gnArgumentsMode: gn.mode,
-        gnArgumentsSha256: gn.sha256,
-        official: false
-      },
-      chromium: {
-        actualVersion,
-        actualRevision,
-        browserProduct: version.Browser,
-        channel: 'unknown-self-built-chromium',
-        expectedRevision,
-        expectedVersion: depsVersion,
-        protocolVersion: version['Protocol-Version'],
-        v8Version: version['V8-Version']
-      },
-      contract: {
-        sha256: sha256(contractContent),
-        summary: contract.summary
-      },
-      fixtures: fixtureResults.map(({ id, ...fixture }) => fixture),
-      oracle: {
-        electronBrowserContextParityProven: false,
-        kind: 'stock-chromium-webui-extension-oracle',
-        schemaVersion: 1
-      },
-      platform: targetState.report.platform,
-      requestedExtensions,
-      source: {
-        commitsAfterPin,
-        dirty: sourceDirty,
-        head: sourceHead,
-        stockSource
-      },
-      webui: {
-        features: oracleFeatures,
-        targetURL: targetState.webuiTarget.url,
-        verified: true
-      }
-    }
-    const metadata = {
-      comparable,
-      comparableSha256: sha256(canonicalJSONString(comparable)),
-      instance: {
-        binary: chrome,
-        chromiumRoot,
-        devtools: {
-          browserWebSocketURL,
-          port: devtools.port
-        },
-        electronHead,
-        metadataPath,
-        profileDir,
-        reportTargetId: targetState.reportTarget.id,
-        webuiTargetId: targetState.webuiTarget.id
-      },
-      nativeExtensionInventory: targetState.report.extensions,
-      targets: normalizedTargets(targetState.targets)
-    }
-    await fs.writeFile(metadataPath, `${JSON.stringify(metadata, null, 2)}\n`)
-    console.log(JSON.stringify({
-      chromium: `${actualVersion}@${expectedRevision}`,
-      comparableSha256: metadata.comparableSha256,
-      fixtures: fixtureResults,
-      metadata: metadataPath,
-      webuiBrowser: true
-    }, null, 2))
-    console.log(`ORACLE_METADATA ${metadataPath}`)
-
-    if (options.exitAfterReady) await stopChrome(child)
-    else if (child.exitCode === null) await once(child, 'exit')
-  } catch (error) {
-    if (child) await stopChrome(child)
-    throw error
+  for (const result of behavior.filter((item) => item.evidenceCandidate && item.feature && matrix.contexts[context].apiFeatures.includes(item.feature))) {
+    ledgerEvidenceCandidates.push({
+      kind: 'api',
+      feature: result.feature,
+      platform,
+      context,
+      test: result.id,
+      coverage: result.coverage,
+      ledgerEligible: false,
+      reason: 'This behavior test covers a member path. A feature ledger entry requires complete feature coverage.'
+    })
   }
 }
 
-if (path.resolve(process.argv[1] || '') === path.resolve(scriptPath)) {
-  main().catch((error) => {
-    console.error(error.stack || error.message)
-    process.exitCode = 1
-  })
+const report = {
+  schemaVersion: 1,
+  generatedAt: new Date().toISOString(),
+  contract: { chromium: contract.chromium, platform, contextMatrix: matrix.contexts },
+  preflight,
+  observedVersions,
+  pinnedVersions,
+  engines,
+  reports,
+  differences,
+  ledgerEvidenceCandidates,
+  comparisonSummary: {
+    comparableContexts: expected.filter((context) => differences[context].comparable),
+    chromiumUnavailableContexts: expected.filter((context) => !reports.chromium[context]),
+    electronMissingAgainstChromium: expected.filter((context) => reports.chromium[context] && !reports.electron[context])
+  }
 }
+await fs.writeFile(output, `${JSON.stringify(report, null, 2)}\n`)
+console.log(JSON.stringify({
+  output,
+  contract: contract.chromium,
+  observedVersions,
+  pinnedVersions,
+  contexts: Object.fromEntries(expected.map((context) => [context, differences[context].missing])),
+  surfaceDifferenceCount: Object.values(differences).filter((item) => item.comparable).reduce((total, item) => total + item.surface.added.length + item.surface.removed.length + item.surface.typeChanged.length, 0),
+  behaviorMismatchCount: Object.values(differences).filter((item) => item.comparable).flatMap((item) => item.behavior).filter((item) => !item.match).length,
+  ledgerEvidenceCandidates: ledgerEvidenceCandidates.length,
+  comparisonSummary: report.comparisonSummary
+}, null, 2))
+const electronRegressions = report.comparisonSummary.electronMissingAgainstChromium
+if (!allowVersionMismatch && (!pinnedVersions || electronRegressions.length)) process.exitCode = 1

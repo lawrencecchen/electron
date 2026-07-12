@@ -3,3 +3,4 @@ fixtures/extensions/
 fixtures/downloads/
 artifacts/
 lab-profile/
+.generated/

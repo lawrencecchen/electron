@@ -45,7 +45,7 @@ From `src/electron/experiments/extensions-browser`:
 ```sh
 npm ci
 npm run fetch-extensions
-npm run oracle:launch -- --chromium-root ../../..
+npm run oracle:webui:launch -- --chromium-root ../../..
 ```
 
 The launcher performs these checks before reporting ready:
@@ -73,7 +73,7 @@ inspect the structured values when it differs.
 For automated startup verification:
 
 ```sh
-npm run oracle:smoke -- --chromium-root ../../..
+npm run oracle:webui:smoke -- --chromium-root ../../..
 ```
 
 Useful overrides are `--chrome`, `--out-dir`, `--profile-dir`, `--metadata`,

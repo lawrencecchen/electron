@@ -11,18 +11,24 @@
     "smoke": "electron . --smoke",
     "smoke:shim": "electron . --smoke --extension-provider=shim",
     "platform:update": "node scripts/generate-platform-contract.mjs",
+    "platform:freshness": "node scripts/check-platform-freshness.mjs",
+    "platform:freshness:strict": "node scripts/check-platform-freshness.mjs --strict",
     "platform:check": "node scripts/check-platform-coverage.mjs",
     "platform:check:linux": "node scripts/check-platform-coverage.mjs --platform linux --strict",
     "platform:check:win": "node scripts/check-platform-coverage.mjs --platform win --strict",
     "platform:check:strict": "node scripts/check-platform-coverage.mjs --strict",
+    "oracle:generate": "node scripts/generate-oracle-probes.mjs",
+    "oracle:run": "node scripts/run-chromium-oracle.mjs",
+    "oracle:webui:launch": "node scripts/run-chromium-webui-oracle.mjs",
+    "oracle:webui:smoke": "node scripts/run-chromium-webui-oracle.mjs --exit-after-ready",
     "test:platform": "node scripts/test-platform-contract.mjs",
-    "oracle:launch": "node scripts/run-chromium-oracle.mjs",
-    "oracle:smoke": "node scripts/run-chromium-oracle.mjs --exit-after-ready",
-    "test:oracle": "node scripts/test-chromium-oracle.mjs"
+    "test:oracle": "npm run test:oracle:differential && npm run test:oracle:webui",
+    "test:oracle:differential": "node scripts/test-oracle.mjs",
+    "test:oracle:webui": "node scripts/test-chromium-oracle.mjs"
   },
   "devDependencies": {
-    "adm-zip": "0.5.16",
-    "electron": "43.0.0",
+    "adm-zip": "0.6.0",
+    "electron": "43.1.0",
     "electron-chrome-extensions": "4.9.0"
   }
 }

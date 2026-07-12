@@ -7,6 +7,7 @@ const {
   conformanceFailures,
   evaluateCoverage,
   loadContract,
+  loadElectronChromiumVersion,
   loadSourceManifest,
   loadSupportLedger,
   root
@@ -27,8 +28,7 @@ const report = JSON.parse(await fs.readFile(reportPath, 'utf8'))
 const targetPlatform = option('--platform', report.platform)
 
 const structuralFailures = []
-if (contract.chromium.version !== sourceManifest.chromium.version) structuralFailures.push('contract Chromium version differs from source manifest')
-if (contract.chromium.revision !== sourceManifest.chromium.revision) structuralFailures.push('contract Chromium revision differs from source manifest')
+if (contract.chromium.version !== loadElectronChromiumVersion()) structuralFailures.push('contract Chromium version differs from Electron DEPS')
 if (ledger.chromiumRevision !== contract.chromium.revision) structuralFailures.push('support ledger Chromium revision differs from contract')
 for (const [key, count] of Object.entries(contract.summary)) {
   if (key !== 'sourceFiles' && key !== 'platforms' && count === 0) structuralFailures.push(`contract denominator ${key} is empty`)
