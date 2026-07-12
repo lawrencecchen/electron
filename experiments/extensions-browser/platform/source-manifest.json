@@ -1,9 +1,6 @@
 {
   "schemaVersion": 1,
-  "chromium": {
-    "version": "152.0.7925.0",
-    "revision": "743c625106f2622aca4eef5f2e717442a54a3687"
-  },
+  "electronDeps": "../../DEPS",
   "repository": "https://chromium.googlesource.com/chromium/src",
   "targetPlatforms": [
     "linux",
@@ -25,5 +22,5 @@
     "permission": "_permission_features",
     "behavior": "_behavior_features"
   },
-  "snapshot": "chromium-152.0.7925.0.json"
+  "snapshot": "chromium-contract.json"
 }

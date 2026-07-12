@@ -7,7 +7,7 @@ const {
   contractSummary,
   evaluateCoverage,
   loadContract,
-  loadSourceManifest,
+  loadElectronChromiumVersion,
   loadSupportLedger,
   parseJSONC,
   parseSchema
@@ -29,10 +29,8 @@ assert.deepEqual(parseSchema(webIDL, 'demo.webidl'), [{
 }])
 
 const contract = loadContract()
-const manifest = loadSourceManifest()
 const ledger = loadSupportLedger()
-assert.equal(contract.chromium.version, manifest.chromium.version)
-assert.equal(contract.chromium.revision, manifest.chromium.revision)
+assert.equal(contract.chromium.version, loadElectronChromiumVersion())
 assert.equal(ledger.chromiumRevision, contract.chromium.revision)
 assert.deepEqual(contract.summary, contractSummary(contract))
 assert.equal(new Set(contract.sources.map((source) => source.path)).size, contract.sources.length)
@@ -66,7 +64,7 @@ assert.ok(coverage.conformanceEvidence.api.unverified.length > 0)
 assert.ok(conformanceFailures(coverage).some((failure) => failure.includes('unverified')))
 
 const unsupportedClaim = structuredClone(ledger)
-unsupportedClaim.apiFeatures.action = { status: 'supported', tests: ['action.test.mjs'] }
+unsupportedClaim.apiFeatures.action = { status: 'supported', platforms: ['linux'], coverage: 'partial', tests: ['action.test.mjs'] }
 const unsupportedClaimCoverage = evaluateCoverage(contract, unsupportedClaim, {
   chrome: contract.chromium.version,
   platform: 'linux',

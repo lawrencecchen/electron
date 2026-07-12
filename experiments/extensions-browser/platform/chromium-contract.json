@@ -1,10 +1,11 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-07-12T00:48:31.032Z",
+  "generatedAt": "2026-07-12T01:00:54.401Z",
   "generationMode": "pinned-gitiles-fallback",
   "chromium": {
     "version": "152.0.7925.0",
-    "revision": "743c625106f2622aca4eef5f2e717442a54a3687"
+    "revision": "743c625106f2622aca4eef5f2e717442a54a3687",
+    "pinSource": "../../DEPS"
   },
   "repository": "https://chromium.googlesource.com/chromium/src",
   "roots": [
