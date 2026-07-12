@@ -4,3 +4,4 @@ import("//electron/build/args/testing.gn")
 # --chrome-profile-smoke=<absolute-profile-path>; startup stops at the first
 # missing Chrome global-service invariant instead of using Electron Session.
 enable_full_chrome_extensions = true
+enable_electron_chrome_profile_runtime = true

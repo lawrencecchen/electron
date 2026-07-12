@@ -1,4 +1,5 @@
 build_gn.patch
+build_expose_global_features_to_embedders.patch
 build_resolve_pgo_profiles_from_electron_state_files.patch
 accelerator.patch
 blink_local_frame.patch

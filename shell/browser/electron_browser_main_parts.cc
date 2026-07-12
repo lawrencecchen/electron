@@ -112,7 +112,9 @@
 
 #if BUILDFLAG(ENABLE_ELECTRON_EXTENSIONS)
 #if BUILDFLAG(ENABLE_FULL_CHROME_EXTENSIONS)
+#include "chrome/browser/extensions/chrome_extensions_browser_client.h"
 #include "chrome/browser/extensions/keyed_services/browser_context_keyed_service_factories.h"
+#include "chrome/browser/profiles/chrome_browser_main_extra_parts_profiles.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/common/extensions/chrome_extensions_client.h"
 #endif
@@ -344,6 +346,7 @@ int ElectronBrowserMainParts::PreCreateThreads() {
 
   // Load resources bundle according to locale.
   std::string loaded_locale = LoadResourceBundle(locale);
+  fake_browser_process_->OnResourceBundleCreated();
 
 #if defined(USE_AURA)
   // NB: must be called _after_ locale resource bundle is loaded,
@@ -483,8 +486,13 @@ int ElectronBrowserMainParts::PreMainMessageLoopRun() {
   extensions::ExtensionsClient::Set(extensions_client_.get());
 
   // BrowserContextKeyedAPIServiceFactories require an ExtensionsBrowserClient.
+#if BUILDFLAG(ENABLE_FULL_CHROME_EXTENSIONS)
+  extensions_browser_client_ =
+      std::make_unique<extensions::ChromeExtensionsBrowserClient>();
+#else
   extensions_browser_client_ =
       std::make_unique<ElectronExtensionsBrowserClient>();
+#endif
   extensions_browser_client_->Init();
   extensions::ExtensionsBrowserClient::Set(extensions_browser_client_.get());
 
@@ -494,7 +502,8 @@ int ElectronBrowserMainParts::PreMainMessageLoopRun() {
       << "An Electron Session created ElectronBrowserContext before Chrome "
          "profile factory registration. The full-browser lane cannot mix "
          "BrowserContext ownership models.";
-  chrome_extensions::EnsureBrowserContextKeyedServiceFactoriesBuilt();
+  ChromeBrowserMainExtraPartsProfiles::
+      EnsureBrowserContextKeyedServiceFactoriesBuilt();
 #else
   extensions::electron::EnsureBrowserContextKeyedServiceFactoriesBuilt();
 #endif
@@ -508,6 +517,8 @@ int ElectronBrowserMainParts::PreMainMessageLoopRun() {
       fake_browser_process_->CreateChromeProfileForSmoke(chrome_profile_path);
   LOG(INFO) << "Chrome profile smoke created ProfileImpl at "
             << chrome_profile->GetPath();
+  content::GetUIThreadTaskRunner({})->PostTask(
+      FROM_HERE, base::BindOnce([] { Browser::Get()->Quit(); }));
 #endif
 
 #if BUILDFLAG(ENABLE_BUILTIN_SPELLCHECKER)
@@ -611,6 +622,11 @@ void ElectronBrowserMainParts::PostCreateMainMessageLoop() {
 }
 
 void ElectronBrowserMainParts::PostMainMessageLoopRun() {
+#if BUILDFLAG(ENABLE_FULL_CHROME_EXTENSIONS)
+  CHECK(extensions_browser_client_);
+  extensions_browser_client_->StartTearDown();
+#endif
+
 #if BUILDFLAG(IS_MAC)
   FreeAppDelegate();
 #endif

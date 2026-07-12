@@ -197,10 +197,11 @@ factories.
 `BrowserProcessImpl` owns the `ProfileManager` slot and destroys it before
 Local State and `SystemNetworkContextManager`. Chromium 152 constructs a
 `BrowserCollectionObserver` inside `ProfileManager`; that observer immediately
-uses the `GlobalBrowserCollection` owned by `GlobalFeatures`. The current probe
-therefore checks that `GlobalFeatures` and its browser collection exist before
-calling the real `ProfileManager` constructor. It exits with an exact invariant
-instead of dereferencing Electron's current null `GetFeatures()` result.
+uses the `GlobalBrowserCollection` owned by `GlobalFeatures`. An Electron-only
+Chromium GN target archives the existing Chrome browser aggregation with
+Chrome's `BrowserProcessImpl` excluded, then links the real
+`global_features.cc`. Electron creates that `GlobalFeatures`, calls `Init()`,
+and verifies the real browser collection before calling `ProfileManager`.
 
 The full-browser build also rejects `ElectronBrowserContext` construction and
 checks that no Electron Session context exists before registering Chrome
@@ -208,14 +209,29 @@ profile factories. These invariants make it impossible to pass the wrong
 BrowserContext type through Chrome's unchecked `Profile` casts while the new
 lane is under construction.
 
-The next source-level prerequisite is to extract `global_features.cc` from the
-Chrome `//chrome/browser:core` monolith into an embeddable implementation target.
-The Electron `BrowserProcessImpl` can then own the result of
-`GlobalFeatures::CreateGlobalFeatures()` and call `Init()`. The following
-ProfileImpl prerequisite is an initialized `ChromeBrowserPolicyConnector`;
-`ProfileImpl::LoadPrefsForNormalStartup()` unconditionally uses its schema
-registry and policy service. Neither prerequisite may be replaced with null
-services or a partial `Profile` adapter.
+The same owner constructs `ChromeBrowserPolicyConnector` before Local State,
+uses Chrome's complete `RegisterLocalState()` and policy-backed
+`chrome_prefs::CreateLocalState()`, delivers the resource-bundle lifecycle
+event, and initializes policy with the system URL loader before creating a
+profile. Local State lives beside the profile path supplied to the smoke switch,
+so `ProfileManager`, profile attributes, policy, and profile preferences share
+one Chrome user-data root. The full lane also uses `ChromeExtensionsBrowserClient`,
+`ChromeExtensionSystemFactory`, and the complete
+`ChromeBrowserMainExtraPartsProfiles` factory registry. Profile network context
+creation dispatches to `ProfileNetworkContextService` and uses Chrome's real
+`SystemNetworkContextManager`; the full-lane build excludes Electron's
+same-named network manager and `NetworkContextService` implementation. This
+removes both the BrowserContext cast and a cross-translation-unit class-layout
+collision.
+
+After a successful profile creation the probe posts a clean quit, exercising
+ProfileManager, policy, GlobalFeatures, Local State, and network teardown. The
+next unsafe owner boundary is the first Chrome-owned tab. The smoke lane has
+explicit guards in `GetMediaDeviceIDSalt()` and the Electron fallback in
+`WillCreateURLLoaderFactory()`; neither may cast a Profile to
+`ElectronBrowserContext`. The profile-backed window slice must route those
+callbacks through Chrome's media-salt and resource-request delegates before it
+creates a `Browser`, `TabStripModel`, or navigating `WebContents`.
 
 The likely minimum GN dependency set includes:
 

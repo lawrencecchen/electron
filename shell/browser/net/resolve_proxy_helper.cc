@@ -4,6 +4,8 @@
 
 #include "shell/browser/net/resolve_proxy_helper.h"
 
+#include "electron/buildflags/buildflags.h"
+
 #include <utility>
 
 #include "base/functional/bind.h"
@@ -14,7 +16,11 @@
 #include "net/proxy_resolution/proxy_info.h"
 #include "services/network/public/mojom/network_context.mojom.h"
 #include "shell/browser/electron_browser_context.h"
+#if BUILDFLAG(ENABLE_FULL_CHROME_EXTENSIONS)
+#include "chrome/browser/net/system_network_context_manager.h"
+#else
 #include "shell/browser/net/system_network_context_manager.h"
+#endif
 
 using content::BrowserThread;
 

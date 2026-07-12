@@ -4,6 +4,8 @@
 
 #include "shell/browser/electron_browser_client.h"
 
+#include "electron/buildflags/buildflags.h"
+
 #if BUILDFLAG(IS_WIN)
 #include <shlobj.h>
 #endif
@@ -26,6 +28,11 @@
 #include "base/strings/escape.h"
 #include "base/strings/string_util.h"
 #include "chrome/browser/browser_process.h"
+#if BUILDFLAG(ENABLE_FULL_CHROME_EXTENSIONS)
+#include "chrome/browser/net/profile_network_context_service.h"
+#include "chrome/browser/net/profile_network_context_service_factory.h"
+#include "chrome/browser/net/system_network_context_manager.h"
+#endif
 #include "chrome/common/chrome_paths.h"
 #include "chrome/common/chrome_switches.h"
 #include "chrome/common/chrome_version.h"
@@ -56,7 +63,6 @@
 #include "content/public/common/content_switches.h"
 #include "content/public/common/url_constants.h"
 #include "crypto/crypto_buildflags.h"
-#include "electron/buildflags/buildflags.h"
 #include "electron/fuses.h"
 #include "extensions/browser/extension_navigation_ui_data.h"
 #include "extensions/common/extension_id.h"
@@ -101,11 +107,12 @@
 #include "shell/browser/login_handler.h"
 #include "shell/browser/media/media_capture_devices_dispatcher.h"
 #include "shell/browser/native_window.h"
-#include "shell/browser/net/network_context_service.h"
+#if !BUILDFLAG(ENABLE_FULL_CHROME_EXTENSIONS)
 #include "shell/browser/net/network_context_service_factory.h"
+#include "shell/browser/net/system_network_context_manager.h"
+#endif
 #include "shell/browser/net/proxying_url_loader_factory.h"
 #include "shell/browser/net/proxying_websocket.h"
-#include "shell/browser/net/system_network_context_manager.h"
 #include "shell/browser/network_hints_handler_impl.h"
 #include "shell/browser/notifications/notification_presenter.h"
 #include "shell/browser/notifications/platform_notification_service.h"
@@ -858,8 +865,7 @@ void ElectronBrowserClient::GetAdditionalWebUISchemes(
 void ElectronBrowserClient::SiteInstanceGotProcessAndSite(
     content::SiteInstance* site_instance) {
 #if BUILDFLAG(ENABLE_ELECTRON_EXTENSIONS)
-  auto* browser_context =
-      static_cast<ElectronBrowserContext*>(site_instance->GetBrowserContext());
+  auto* browser_context = site_instance->GetBrowserContext();
   if (!browser_context->IsOffTheRecord()) {
     extensions::ExtensionRegistry* registry =
         extensions::ExtensionRegistry::Get(browser_context);
@@ -913,12 +919,19 @@ void ElectronBrowserClient::GetMediaDeviceIDSalt(
     const net::SiteForCookies& site_for_cookies,
     const blink::StorageKey& storage_key,
     base::OnceCallback<void(bool, const std::string&)> callback) {
+#if BUILDFLAG(ENABLE_FULL_CHROME_EXTENSIONS)
+  CHECK(false)
+      << "Chrome Profile media device salts must route through "
+         "MediaDeviceSaltServiceFactory before the full-browser lane creates "
+         "a tab.";
+#else
   constexpr bool persistent_media_device_id_allowed = true;
   std::string persistent_media_device_id_salt =
       static_cast<ElectronBrowserContext*>(rfh->GetBrowserContext())
           ->GetMediaDeviceIDSalt();
   std::move(callback).Run(persistent_media_device_id_allowed,
                           persistent_media_device_id_salt);
+#endif
 }
 
 base::FilePath ElectronBrowserClient::GetLoggingFileName(
@@ -962,9 +975,18 @@ void ElectronBrowserClient::ConfigureNetworkContextParams(
     cert_verifier::mojom::CertVerifierCreationParams*
         cert_verifier_creation_params) {
   DCHECK(browser_context);
+#if BUILDFLAG(ENABLE_FULL_CHROME_EXTENSIONS)
+  auto* service =
+      ProfileNetworkContextServiceFactory::GetForContext(browser_context);
+  CHECK(service);
+  service->ConfigureNetworkContextParams(in_memory, relative_partition_path,
+                                         network_context_params,
+                                         cert_verifier_creation_params);
+#else
   return NetworkContextServiceFactory::GetForContext(browser_context)
       ->ConfigureNetworkContextParams(network_context_params,
                                       cert_verifier_creation_params);
+#endif
 }
 
 network::mojom::NetworkContext*
@@ -1520,6 +1542,12 @@ void ElectronBrowserClient::WillCreateURLLoaderFactory(
   }
 #endif
 
+#if BUILDFLAG(ENABLE_FULL_CHROME_EXTENSIONS)
+  CHECK(false)
+      << "Chrome Profile URLLoader factories must use Chrome protocol and "
+         "resource-request delegates before the full-browser lane navigates "
+         "a tab.";
+#else
   auto [proxied_receiver, target_factory_remote] = factory_builder.Append();
 
   // Required by WebRequestInfoInitParams.
@@ -1553,6 +1581,7 @@ void ElectronBrowserClient::WillCreateURLLoaderFactory(
       std::move(target_factory_remote),
       std::move(header_client_receiver),
       type};
+#endif
 }
 
 std::vector<std::unique_ptr<content::URLLoaderRequestInterceptor>>

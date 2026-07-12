@@ -31,6 +31,7 @@ class ScopedNativeScreen;
 
 namespace extensions {
 class ExtensionsClient;
+class ExtensionsBrowserClient;
 }  // namespace extensions
 
 #if defined(USE_AURA)
@@ -178,7 +179,8 @@ class ElectronBrowserMainParts : public content::BrowserMainParts {
 
 #if BUILDFLAG(ENABLE_ELECTRON_EXTENSIONS)
   std::unique_ptr<extensions::ExtensionsClient> extensions_client_;
-  std::unique_ptr<ElectronExtensionsBrowserClient> extensions_browser_client_;
+  std::unique_ptr<extensions::ExtensionsBrowserClient>
+      extensions_browser_client_;
 #endif
 
   mojo::Remote<device::mojom::GeolocationControl> geolocation_control_;
