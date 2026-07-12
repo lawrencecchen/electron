@@ -1,0 +1,31 @@
+:root {
+  color-scheme: dark;
+  font-family: system-ui, sans-serif;
+  background: #0b1020;
+  color: #e7ecff;
+}
+
+body {
+  margin: 0;
+}
+
+main {
+  max-width: 960px;
+  margin: 48px auto;
+  padding: 0 32px;
+}
+
+.eyebrow {
+  color: #7ee7b8;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+}
+
+pre {
+  overflow: auto;
+  padding: 20px;
+  border: 1px solid #34405c;
+  border-radius: 12px;
+  background: #11182a;
+}

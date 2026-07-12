@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-07-12T00:48:31.032Z",
+  "generatedAt": "2026-07-12T01:18:35.869Z",
   "generationMode": "pinned-gitiles-fallback",
   "chromium": {
-    "version": "152.0.7925.0",
-    "revision": "743c625106f2622aca4eef5f2e717442a54a3687"
+    "version": "152.0.7945.0",
+    "revision": "c3d37161338e586b75ae8f9b3f8088be6c64c2d7"
   },
   "repository": "https://chromium.googlesource.com/chromium/src",
   "roots": [
@@ -19,7 +19,7 @@
   "sources": [
     {
       "path": "chrome/common/extensions/api/_api_features.json",
-      "sha256": "083689249b8505ffd0670c14c047a398a728e426f8bb5fd62e5e679afb5541e1"
+      "sha256": "235879901385a1c399162eea4ab02edb2ae2d47cc4a4fce8a66824d98616b827"
     },
     {
       "path": "chrome/common/extensions/api/_api_features.override.json",
@@ -27,7 +27,7 @@
     },
     {
       "path": "chrome/common/extensions/api/_manifest_features.json",
-      "sha256": "e6c06642987b92aedb04542c85fc39432f03efe127bbe76b6db92146d397817b"
+      "sha256": "292ffd2fe5c8c5ee5b566bb1d0c0de0eae7d5be14cb1185679443f41c0e5a500"
     },
     {
       "path": "chrome/common/extensions/api/_manifest_features.override.json",
@@ -159,7 +159,7 @@
     },
     {
       "path": "chrome/common/extensions/api/dictation_private.webidl",
-      "sha256": "04d3bb8558894a43fef9966a4f30818c2cb52d700bf0ef61f9f6aa4d2af65b48"
+      "sha256": "422227958fd09ecbe96a86c797ff89082023eb8ccd9354f8be20f519e953dd31"
     },
     {
       "path": "chrome/common/extensions/api/document_scan.webidl",
@@ -235,15 +235,15 @@
     },
     {
       "path": "chrome/common/extensions/api/file_manager_private.idl",
-      "sha256": "27611c9c974c655830808ff8e36ef29fc61e737e9a7ac2c6a11195f87fa54e85"
+      "sha256": "0eca4d3ef6ac98d48fddcef8667de34b28a7bbbcb76c8a0b10d3d094d92c6bd2"
     },
     {
       "path": "chrome/common/extensions/api/file_system_provider_internal.idl",
       "sha256": "7048dd3295d3818d7b5bd4cb5b995c4516fefe45f29d9aa3a29659e7340ffb0d"
     },
     {
-      "path": "chrome/common/extensions/api/file_system_provider.idl",
-      "sha256": "7e9106c281526a313653cf7916d0e5487b24d5e2d6e13346e7c386af1822e352"
+      "path": "chrome/common/extensions/api/file_system_provider.webidl",
+      "sha256": "0a7807840739f36a281c445198126607fcf73e9d76df38df2402325a3970c8f3"
     },
     {
       "path": "chrome/common/extensions/api/font_settings.json",
@@ -294,8 +294,8 @@
       "sha256": "3ccb84ef60ee401cdb5d79b30de283bcf3de07cc0ea3f23afc6bea850f3210ce"
     },
     {
-      "path": "chrome/common/extensions/api/login_screen_storage.idl",
-      "sha256": "495ca14d0922cd89c67bab3b3ed2db96ae743cdd3ba592841bbbde2df7c6bb2c"
+      "path": "chrome/common/extensions/api/login_screen_storage.webidl",
+      "sha256": "4000dc3d852d4dbc0c9f9d9d880d119875152c62f3a2130470199a6cc1819daa"
     },
     {
       "path": "chrome/common/extensions/api/login_screen_ui.idl",
@@ -347,7 +347,7 @@
     },
     {
       "path": "chrome/common/extensions/api/pdf_viewer_private.idl",
-      "sha256": "4c55547e5555c7bc2f5a4f199694597632229c582948385930f88a7acaab5cde"
+      "sha256": "f4ea43722467b187f844ca2d3e5f9c65fc7d3ea6c030091929191bdc463c9f7d"
     },
     {
       "path": "chrome/common/extensions/api/permissions.json",
@@ -371,7 +371,7 @@
     },
     {
       "path": "chrome/common/extensions/api/privacy.json",
-      "sha256": "c4f2bbf72d820f9ab6f357fef54bb91eb24dc510abef72097a3576cae8b1b47b"
+      "sha256": "2d4bc38110f71dd09c30dbed32b63ccc3e7cb4555482f4ad4ce3df71ba5f6043"
     },
     {
       "path": "chrome/common/extensions/api/processes.idl",
@@ -507,7 +507,7 @@
     },
     {
       "path": "extensions/common/api/_api_features.json",
-      "sha256": "c133e97a6d5fb30d053714a615fd0e91462994d6d23923feccb7f5ed990d2e3e"
+      "sha256": "12d2e8c0c5a646691b99e7d08194d1855759c58b4ac4cadc0ca1ea857365801d"
     },
     {
       "path": "extensions/common/api/_api_features.override.json",
@@ -519,7 +519,7 @@
     },
     {
       "path": "extensions/common/api/_manifest_features.json",
-      "sha256": "187ffc5b5f910a06690d1e688e7b208526e5497e5e641fc0aded88ec420366e7"
+      "sha256": "b7b533c3b7f8f9340fb89a802c86a2183154d70603887aa2b150715887635ee7"
     },
     {
       "path": "extensions/common/api/_manifest_features.override.json",
@@ -647,7 +647,7 @@
     },
     {
       "path": "extensions/common/api/file_system.idl",
-      "sha256": "c1d14f520da3e433245a08ca1d661a046cccc1be4a912132f5f99f27469f7033"
+      "sha256": "0b8fe8e5541a8e53f7fe2d523187443f0d3fa7bdc90ad69fa518017a7a1c20be"
     },
     {
       "path": "extensions/common/api/guest_view_internal.json",
@@ -835,7 +835,7 @@
     },
     {
       "path": "extensions/common/api/web_request_internal.json",
-      "sha256": "01ddb7599e987473fb92ff075d7e20d9547de49f5985e53594b093117b878442"
+      "sha256": "7ed6c7271cb56995cfc9838824d8bd1d315ef7ea4b8538976ad6f09f03b999cb"
     },
     {
       "path": "extensions/common/api/web_request.json",
@@ -2793,7 +2793,7 @@
       "properties": [],
       "types": [],
       "sources": [
-        "chrome/common/extensions/api/file_system_provider.idl"
+        "chrome/common/extensions/api/file_system_provider.webidl"
       ]
     },
     "fileSystemProviderInternal": {
@@ -3265,7 +3265,7 @@
       "properties": [],
       "types": [],
       "sources": [
-        "chrome/common/extensions/api/login_screen_storage.idl"
+        "chrome/common/extensions/api/login_screen_storage.webidl"
       ]
     },
     "loginScreenUi": {
@@ -5006,7 +5006,8 @@
     "webRequestInternal": {
       "functions": [
         "addEventListener",
-        "eventHandled"
+        "eventHandled",
+        "eventHandlingDone"
       ],
       "events": [],
       "properties": [],
@@ -7294,6 +7295,7 @@
     "webRequestInternal",
     "webRequestInternal.addEventListener",
     "webRequestInternal.eventHandled",
+    "webRequestInternal.eventHandlingDone",
     "webViewInternal",
     "webViewInternal.MAX_CAPTURE_VISIBLE_REGION_CALLS_PER_SECOND",
     "webViewInternal.addContentScripts",
@@ -9468,8 +9470,7 @@
           "source": "chrome/common/extensions/api/_api_features.json",
           "override": false,
           "definition": {
-            "min_manifest_version": 3,
-            "feature_flag": "ApiPermissionsHostAccessRequests"
+            "min_manifest_version": 3
           }
         }
       ],
@@ -9478,8 +9479,7 @@
           "source": "chrome/common/extensions/api/_api_features.json",
           "override": false,
           "definition": {
-            "min_manifest_version": 3,
-            "feature_flag": "ApiPermissionsHostAccessRequests"
+            "min_manifest_version": 3
           }
         }
       ],
@@ -12301,51 +12301,6 @@
           }
         }
       ],
-      "userScripts.getWorldConfigurations": [
-        {
-          "source": "extensions/common/api/_api_features.json",
-          "override": false,
-          "definition": {
-            "dependencies": [
-              "permission:userScripts"
-            ],
-            "contexts": [
-              "privileged_extension"
-            ],
-            "feature_flag": "ApiUserScriptsMultipleWorlds"
-          }
-        }
-      ],
-      "userScripts.resetWorldConfiguration": [
-        {
-          "source": "extensions/common/api/_api_features.json",
-          "override": false,
-          "definition": {
-            "dependencies": [
-              "permission:userScripts"
-            ],
-            "contexts": [
-              "privileged_extension"
-            ],
-            "feature_flag": "ApiUserScriptsMultipleWorlds"
-          }
-        }
-      ],
-      "userScripts.execute": [
-        {
-          "source": "extensions/common/api/_api_features.json",
-          "override": false,
-          "definition": {
-            "dependencies": [
-              "permission:userScripts"
-            ],
-            "contexts": [
-              "privileged_extension"
-            ],
-            "feature_flag": "ApiUserScriptsExecute"
-          }
-        }
-      ],
       "virtualKeyboard": [
         {
           "source": "extensions/common/api/_api_features.json",
@@ -12581,19 +12536,6 @@
           }
         }
       ],
-      "browser_action": [
-        {
-          "source": "chrome/common/extensions/api/_manifest_features.json",
-          "override": false,
-          "definition": {
-            "channel": "stable",
-            "extension_types": [
-              "extension"
-            ],
-            "max_manifest_version": 2
-          }
-        }
-      ],
       "chrome_settings_overrides": [
         {
           "source": "chrome/common/extensions/api/_manifest_features.json",
@@ -12608,106 +12550,6 @@
               "mac"
             ]
           }
-        }
-      ],
-      "content_scripts": [
-        {
-          "source": "chrome/common/extensions/api/_manifest_features.json",
-          "override": false,
-          "definition": [
-            {
-              "channel": "stable",
-              "extension_types": [
-                "extension",
-                "legacy_packaged_app"
-              ]
-            },
-            {
-              "channel": "stable",
-              "dependencies": [
-                "behavior:imprivata_login_screen_extension"
-              ],
-              "extension_types": [
-                "login_screen_extension"
-              ]
-            }
-          ]
-        }
-      ],
-      "converted_from_user_script": [
-        {
-          "source": "chrome/common/extensions/api/_manifest_features.json",
-          "override": false,
-          "definition": {
-            "channel": "stable",
-            "extension_types": [
-              "extension",
-              "legacy_packaged_app",
-              "hosted_app"
-            ]
-          }
-        }
-      ],
-      "display_in_launcher": [
-        {
-          "source": "chrome/common/extensions/api/_manifest_features.json",
-          "override": false,
-          "definition": [
-            {
-              "channel": "stable",
-              "extension_types": [
-                "legacy_packaged_app",
-                "platform_app",
-                "hosted_app"
-              ],
-              "location": "component"
-            },
-            {
-              "channel": "stable",
-              "extension_types": [
-                "legacy_packaged_app",
-                "platform_app"
-              ],
-              "allowlist": [
-                "64291898C201DAF15B090EC4B9EC270BEB6BE6FF",
-                "07BD6A765FFC289FF755D7CAB2893A40EC337FEC",
-                "896B85CC7E913E11C34892C1425A093C0701D386",
-                "11A01C82EF355E674E4F9728A801F5C3CB40D83F",
-                "F410C88469990EE7947450311D24B8AF2ADB2595"
-              ]
-            }
-          ]
-        }
-      ],
-      "display_in_new_tab_page": [
-        {
-          "source": "chrome/common/extensions/api/_manifest_features.json",
-          "override": false,
-          "definition": [
-            {
-              "channel": "stable",
-              "extension_types": [
-                "legacy_packaged_app",
-                "platform_app",
-                "hosted_app"
-              ],
-              "location": "component"
-            },
-            {
-              "channel": "stable",
-              "extension_types": [
-                "legacy_packaged_app",
-                "platform_app"
-              ],
-              "allowlist": [
-                "64291898C201DAF15B090EC4B9EC270BEB6BE6FF",
-                "07BD6A765FFC289FF755D7CAB2893A40EC337FEC",
-                "896B85CC7E913E11C34892C1425A093C0701D386",
-                "11A01C82EF355E674E4F9728A801F5C3CB40D83F",
-                "F410C88469990EE7947450311D24B8AF2ADB2595"
-              ]
-            }
-          ]
         }
       ],
       "file_browser_handlers": [
@@ -12788,22 +12630,6 @@
             "extension_types": [
               "extension",
               "legacy_packaged_app"
-            ]
-          }
-        }
-      ],
-      "optional_permissions": [
-        {
-          "source": "chrome/common/extensions/api/_manifest_features.json",
-          "override": false,
-          "definition": {
-            "channel": "stable",
-            "extension_types": [
-              "extension",
-              "legacy_packaged_app",
-              "hosted_app",
-              "platform_app",
-              "chromeos_system_extension"
             ]
           }
         }
@@ -13075,6 +12901,19 @@
           ]
         }
       ],
+      "browser_action": [
+        {
+          "source": "extensions/common/api/_manifest_features.json",
+          "override": false,
+          "definition": {
+            "channel": "stable",
+            "extension_types": [
+              "extension"
+            ],
+            "max_manifest_version": 2
+          }
+        }
+      ],
       "chrome_url_overrides": [
         {
           "source": "extensions/common/api/_manifest_features.json",
@@ -13159,6 +12998,44 @@
               ]
             }
           ]
+        }
+      ],
+      "content_scripts": [
+        {
+          "source": "extensions/common/api/_manifest_features.json",
+          "override": false,
+          "definition": [
+            {
+              "channel": "stable",
+              "extension_types": [
+                "extension",
+                "legacy_packaged_app"
+              ]
+            },
+            {
+              "channel": "stable",
+              "dependencies": [
+                "behavior:imprivata_login_screen_extension"
+              ],
+              "extension_types": [
+                "login_screen_extension"
+              ]
+            }
+          ]
+        }
+      ],
+      "converted_from_user_script": [
+        {
+          "source": "extensions/common/api/_manifest_features.json",
+          "override": false,
+          "definition": {
+            "channel": "stable",
+            "extension_types": [
+              "extension",
+              "legacy_packaged_app",
+              "hosted_app"
+            ]
+          }
         }
       ],
       "content_security_policy": [
@@ -13264,6 +13141,68 @@
             "channel": "stable",
             "extension_types": "all"
           }
+        }
+      ],
+      "display_in_launcher": [
+        {
+          "source": "extensions/common/api/_manifest_features.json",
+          "override": false,
+          "definition": [
+            {
+              "channel": "stable",
+              "extension_types": [
+                "legacy_packaged_app",
+                "platform_app",
+                "hosted_app"
+              ],
+              "location": "component"
+            },
+            {
+              "channel": "stable",
+              "extension_types": [
+                "legacy_packaged_app",
+                "platform_app"
+              ],
+              "allowlist": [
+                "64291898C201DAF15B090EC4B9EC270BEB6BE6FF",
+                "07BD6A765FFC289FF755D7CAB2893A40EC337FEC",
+                "896B85CC7E913E11C34892C1425A093C0701D386",
+                "11A01C82EF355E674E4F9728A801F5C3CB40D83F",
+                "F410C88469990EE7947450311D24B8AF2ADB2595"
+              ]
+            }
+          ]
+        }
+      ],
+      "display_in_new_tab_page": [
+        {
+          "source": "extensions/common/api/_manifest_features.json",
+          "override": false,
+          "definition": [
+            {
+              "channel": "stable",
+              "extension_types": [
+                "legacy_packaged_app",
+                "platform_app",
+                "hosted_app"
+              ],
+              "location": "component"
+            },
+            {
+              "channel": "stable",
+              "extension_types": [
+                "legacy_packaged_app",
+                "platform_app"
+              ],
+              "allowlist": [
+                "64291898C201DAF15B090EC4B9EC270BEB6BE6FF",
+                "07BD6A765FFC289FF755D7CAB2893A40EC337FEC",
+                "896B85CC7E913E11C34892C1425A093C0701D386",
+                "11A01C82EF355E674E4F9728A801F5C3CB40D83F",
+                "F410C88469990EE7947450311D24B8AF2ADB2595"
+              ]
+            }
+          ]
         }
       ],
       "event_rules": [
@@ -13583,7 +13522,7 @@
           "source": "extensions/common/api/_manifest_features.json",
           "override": false,
           "definition": {
-            "channel": "canary",
+            "channel": "stable",
             "extension_types": [
               "extension"
             ],
@@ -13735,6 +13674,22 @@
               "extension"
             ],
             "min_manifest_version": 3
+          }
+        }
+      ],
+      "optional_permissions": [
+        {
+          "source": "extensions/common/api/_manifest_features.json",
+          "override": false,
+          "definition": {
+            "channel": "stable",
+            "extension_types": [
+              "extension",
+              "legacy_packaged_app",
+              "hosted_app",
+              "platform_app",
+              "chromeos_system_extension"
+            ]
           }
         }
       ],
@@ -18241,27 +18196,27 @@
   },
   "summary": {
     "namespaces": 190,
-    "schemaMembers": 2155,
-    "apiFeatures": 276,
+    "schemaMembers": 2156,
+    "apiFeatures": 273,
     "manifestFeatures": 92,
     "permissionFeatures": 175,
     "behaviorFeatures": 8,
     "sourceFiles": 209,
     "platforms": {
       "linux": {
-        "apiFeatures": 260,
+        "apiFeatures": 257,
         "manifestFeatures": 86,
         "permissionFeatures": 128,
         "behaviorFeatures": 4
       },
       "mac": {
-        "apiFeatures": 261,
+        "apiFeatures": 258,
         "manifestFeatures": 87,
         "permissionFeatures": 128,
         "behaviorFeatures": 4
       },
       "win": {
-        "apiFeatures": 263,
+        "apiFeatures": 260,
         "manifestFeatures": 87,
         "permissionFeatures": 128,
         "behaviorFeatures": 4

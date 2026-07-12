@@ -45,8 +45,8 @@ policy, and allowlist. It never counts as proof that the full platform passes.
 
 ## Chromium contract
 
-`platform/source-manifest.json` pins Chromium 152.0.7925.0 at revision
-`743c625106f2622aca4eef5f2e717442a54a3687`. The generated snapshot inventories
+`platform/source-manifest.json` pins Chromium 152.0.7945.0 at revision
+`c3d37161338e586b75ae8f9b3f8088be6c64c2d7`. The generated snapshot inventories
 both Chromium schema roots and their API, manifest, permission, and behavior
 feature files. It includes private and platform-restricted entries so an item
 cannot disappear from the denominator merely because a canary cannot access
@@ -69,6 +69,47 @@ For example: `"tabs": { "status": "supported", "platforms": ["linux"],
 "tests": ["conformance/tabs.test.mjs"] }`.
 A Chromium roll requires regenerating the snapshot and ledger against the new
 revision.
+
+## Stock Chromium Webium oracle
+
+The `oracle:launch` lane runs the real Chromium `chrome` target built from a
+clean checkout of the pinned Chromium revision. It enables Chromium's
+`Webium`, `SurfaceEmbed`, and
+`ExtensionsMenuAccessControl` features, which select `WebUIBrowserWindow` and
+its HTML top chrome. It uses a clean dedicated profile, requests the pinned
+uBlock Origin and Bitwarden fixtures as unpacked extensions, and verifies the
+native extension registry with a fixed-ID probe extension.
+
+Build `chrome` from the Chromium `src` directory:
+
+```sh
+gn gen out/ChromeOracle --args='import("//electron/build/args/chromium-webui-oracle.gn")'
+autoninja -C out/ChromeOracle chrome
+```
+
+Then run from this directory on Linux or Windows:
+
+```sh
+npm ci
+npm run fetch-extensions
+npm run oracle:launch -- --chromium-root ../../..
+```
+
+Use `npm run oracle:smoke -- --chromium-root ../../..` to exit after startup
+verification. The launcher writes
+`artifacts/chromium-oracle-startup.json`. Its `comparable` object contains the
+pinned source identity, resolved GN arguments, native runtime versions,
+fixture hashes and load outcomes, platform information, and Webium evidence.
+`comparableSha256` is stable for identical inputs. The `instance` object holds
+machine-specific paths and the ephemeral DevTools endpoint.
+
+This is the stock Chromium browser oracle and the architectural base for the
+full-browser lane. It proves how Chrome behaves with a real `ProfileImpl`,
+`Browser`, tab model, extension system, and `WebUIBrowserWindow`. It does not
+prove that Electron's current `ElectronBrowserContext` has Chrome extension
+parity. A Chrome binary built after applying Electron's Chromium patch stack
+requires `--allow-patched-source` and is labeled as an architectural smoke run,
+not an exact oracle result.
 
 The stock Electron baseline is expected to fail. Electron documents arbitrary
 Chrome extensions as unsupported and registers only a subset of the extension
