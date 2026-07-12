@@ -10,7 +10,11 @@ const {
   parseElectronChromiumVersion,
   root
 } = require('./platform-contract.cjs')
-const { chromiumVersionFromVersionFile, newestTaggedVersion } = require('./platform-freshness.cjs')
+const {
+  chromiumVersionFromVersionFile,
+  compareChromiumVersions,
+  newestTaggedVersion
+} = require('./platform-freshness.cjs')
 const args = process.argv.slice(2)
 const contract = loadContract()
 const sourceManifest = loadSourceManifest()
@@ -35,6 +39,7 @@ const refs = JSON.parse(rawRefs.replace(/^\)\]\}'\n/, ''))
 const major = localElectronPin.split('.')[0]
 const newestBuildableTag = newestTaggedVersion(refs, major)
 const newestBuildableRevision = refs[newestBuildableTag]?.value
+const upstreamComparison = compareChromiumVersions(localElectronPin, upstreamElectronPin)
 
 const report = {
   schemaVersion: 1,
@@ -42,7 +47,9 @@ const report = {
   electron: {
     localPin: localElectronPin,
     upstreamMainPin: upstreamElectronPin,
-    current: localElectronPin === upstreamElectronPin
+    matchesUpstream: upstreamComparison === 0,
+    notBehindUpstream: upstreamComparison >= 0,
+    aheadOfUpstream: upstreamComparison > 0
   },
   contract: {
     version: contract.chromium.version,
@@ -68,4 +75,4 @@ const output = path.join(root, 'artifacts', 'platform-freshness.json')
 await fs.mkdir(path.dirname(output), { recursive: true })
 await fs.writeFile(output, `${JSON.stringify(report, null, 2)}\n`)
 console.log(JSON.stringify({ output, ...report }, null, 2))
-if (args.includes('--strict') && (!report.electron.current || !report.contract.matchesElectronDEPS || report.chromium.rollAvailable)) process.exitCode = 1
+if (args.includes('--strict') && (!report.electron.notBehindUpstream || !report.contract.matchesElectronDEPS || report.chromium.rollAvailable)) process.exitCode = 1
