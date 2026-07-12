@@ -7,7 +7,9 @@
   "scripts": {
     "install": "node -e \"console.log('Run npm run build after setting GHOSTTY_XCFRAMEWORK')\"",
     "build": "node-gyp rebuild --target=43.1.0 --dist-url=https://electronjs.org/headers",
-    "start": "electron ."
+    "start": "electron .",
+    "stress": "electron . --stress",
+    "stress:cycles": "node scripts/stress-cycles.mjs"
   },
   "devDependencies": {
     "electron": "43.1.0",
