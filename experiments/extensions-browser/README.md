@@ -43,6 +43,14 @@ extensions. Canary visibility is diagnostic because Chrome gates API exposure
 by permission, context, manifest version, extension type, channel, platform,
 policy, and allowlist. It never counts as proof that the full platform passes.
 
+`npm run stress:cycles` runs five fresh Electron processes against one
+persistent profile. Each process performs 50 page/form/popup cycles, reloads
+both production extensions every five iterations, and force-crashes then
+recovers the page renderer every ten iterations. Unexpected renderer or child
+process loss, unresponsive views, nonzero exits, timeouts, missing reports, and
+post-warmup retained-memory growth fail the run. Override counts with
+`--cycles`, `--iterations`, `--reload-every`, and `--crash-every` after `--`.
+
 ## Chromium contract
 
 `platform/source-manifest.json` points to Electron's `DEPS`. The generator reads

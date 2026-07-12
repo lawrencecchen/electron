@@ -7,7 +7,7 @@ import {
   matchFixtures,
   parseBrowserRevision,
   parseDevToolsActivePort
-} from './run-chromium-oracle.mjs'
+} from './run-chromium-webui-oracle.mjs'
 
 const key = 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAuWlXrHbU4hxvIcDjU0sHO656loD/yj6TGeu0mYPo65oxAiqquEU6q7YcMP6IoKNq6iF7+ibvUtaAeuNGAVng/hhtd6mUTrueIzWrLYxef5uXfudjc2Gx85CTmaAlGwXLz7jDoDw2itrxm+q93kxgA3C873s6kLjo57lGeBHQkUF8SmE4fxCCiIfCN12d/l0KtivIxJ7Vx05Ep2/ZahZyyIg79oYigRvsrtQT8AMM6L6r0CpULD4NDKtoZZsf2unJrH856UBT0T9u81Zef83dwwUDVFXCj97u3W+Svb11tXfdQFG1TXLDuaKAYjh4b7aC/o636M596GA8mOFQAaA0IwIDAQAB'
 assert.equal(extensionIdFromKey(key), 'pgbgbjeeogkcjkafklffklbidjndeadj')

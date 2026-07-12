@@ -10,6 +10,8 @@
     "start:shim": "electron . --extension-provider=shim",
     "smoke": "electron . --smoke",
     "smoke:shim": "electron . --smoke --extension-provider=shim",
+    "stress": "electron . --stress",
+    "stress:cycles": "node scripts/stress-extension-cycles.mjs",
     "platform:update": "node scripts/generate-platform-contract.mjs",
     "platform:freshness": "node scripts/check-platform-freshness.mjs",
     "platform:freshness:strict": "node scripts/check-platform-freshness.mjs --strict",
