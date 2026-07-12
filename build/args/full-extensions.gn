@@ -1,5 +1,6 @@
 import("//electron/build/args/testing.gn")
 
-# Compile/link validation only. The resulting binary intentionally fails at
-# startup until the ProfileImpl-backed Chrome browser lane is implemented.
+# Opt-in Chrome browser bring-up configuration. Run the binary with
+# --chrome-profile-smoke=<absolute-profile-path>; startup stops at the first
+# missing Chrome global-service invariant instead of using Electron Session.
 enable_full_chrome_extensions = true

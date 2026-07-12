@@ -13,9 +13,11 @@
 #include <memory>
 #include <string>
 
+#include "base/files/file_path.h"
 #include "chrome/browser/browser_process.h"
 #include "components/embedder_support/origin_trials/origin_trials_settings_storage.h"
 #include "components/prefs/value_map_pref_store.h"
+#include "electron/buildflags/buildflags.h"
 #include "printing/buildflags/buildflags.h"
 #include "services/network/public/cpp/network_quality_tracker.h"
 #include "services/network/public/cpp/shared_url_loader_factory.h"
@@ -27,6 +29,7 @@
 #endif
 
 class PrefService;
+class Profile;
 
 namespace printing {
 class PrintJobManager;
@@ -59,11 +62,22 @@ class BrowserProcessImpl : public BrowserProcess {
   void PostEarlyInitialization();
   void PreCreateThreads();
   void PreMainMessageLoopRun();
-  void PostDestroyThreads() {}
+  void PostDestroyThreads();
   void PostMainMessageLoopRun();
   void SetSystemLocale(const std::string& locale);
   const std::string& GetSystemLocale() const;
   electron::ResolveProxyHelper* GetResolveProxyHelper();
+
+#if BUILDFLAG(ENABLE_FULL_CHROME_EXTENSIONS)
+  // Initializes the owner for Chrome ProfileImpl instances. The full-browser
+  // lane must satisfy Chrome's global feature invariant before this can create
+  // ProfileManager; it must never attach Chrome keyed services to an
+  // ElectronBrowserContext.
+  void InitializeChromeProfileManager(
+      const base::FilePath& chrome_profile_path);
+  Profile* CreateChromeProfileForSmoke(
+      const base::FilePath& chrome_profile_path);
+#endif
 
 #if BUILDFLAG(IS_LINUX)
   void SetLinuxStorageBackend(os_crypt::SelectedLinuxBackend selected_backend);
@@ -177,6 +191,15 @@ class BrowserProcessImpl : public BrowserProcess {
   std::unique_ptr<metrics::MetricsServiceClient> metrics_service_client_;
 
   std::unique_ptr<os_crypt_async::OSCryptAsync> os_crypt_async_;
+
+#if BUILDFLAG(ENABLE_FULL_CHROME_EXTENSIONS)
+  // Chrome owns ProfileImpl objects through ProfileManager. This member is
+  // deliberately separate from ElectronBrowserContext's Session ownership.
+  std::unique_ptr<ProfileManager> chrome_profile_manager_;
+  base::FilePath chrome_profile_user_data_dir_;
+#endif
+
+  bool is_shutting_down_ = false;
 };
 
 #endif  // ELECTRON_SHELL_BROWSER_BROWSER_PROCESS_IMPL_H_

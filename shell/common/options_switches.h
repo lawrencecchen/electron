@@ -335,6 +335,13 @@ inline constexpr base::cstring_view kServiceWorkerPreload =
 // be set for node initialization.
 inline constexpr base::cstring_view kNoStdioInit = "no-stdio-init";
 
+// Creates the Chrome-backed profile substrate at the supplied absolute profile
+// path. This is only available in enable_full_chrome_extensions builds and is
+// intentionally a command-line-only bring-up probe until the Chrome browser
+// lane has a public API.
+inline constexpr base::cstring_view kChromeProfileSmoke =
+    "chrome-profile-smoke";
+
 }  // namespace switches
 
 }  // namespace electron

@@ -157,9 +157,9 @@ if (enable_electron_extensions) {
 
 if (enable_full_chrome_extensions) {
   assert(enable_electron_extensions,
-         "Chrome extension provider scaffolding requires enable_electron_extensions=true")
+         "The Chrome extension browser lane requires enable_electron_extensions=true")
   assert(!is_official_build,
-         "Chrome extension provider scaffolding must not be shipped")
+         "The incomplete Chrome extension browser lane must not be shipped")
 }
 
 config("branding") {
@@ -870,9 +870,16 @@ source_set("electron_lib") {
 
     if (enable_full_chrome_extensions) {
       deps += [
+        "//chrome/browser:global_features",
         "//chrome/browser/extensions",
         "//chrome/browser/extensions/api:api",
         "//chrome/browser/extensions/keyed_services:keyed_service_factories",
+        "//chrome/browser/policy",
+        "//chrome/browser/prefs:impl",
+        "//chrome/browser/profiles:misc",
+        "//chrome/browser/profiles:profile",
+        "//chrome/browser/profiles:profile_manager",
+        "//chrome/browser/profiles:profile_manager_impl",
         "//chrome/common/extensions",
         "//chrome/renderer/extensions",
       ]

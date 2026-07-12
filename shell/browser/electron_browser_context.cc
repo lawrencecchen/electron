@@ -40,6 +40,7 @@
 #include "content/public/browser/shared_cors_origin_access_list.h"
 #include "content/public/browser/storage_partition.h"
 #include "content/public/browser/web_contents_media_capture_id.h"
+#include "electron/buildflags/buildflags.h"
 #include "gin/arguments.h"
 #include "media/audio/audio_device_description.h"
 #include "services/network/public/cpp/features.h"
@@ -331,6 +332,15 @@ struct PartitionKey {
       std::map<PartitionKey, std::unique_ptr<ElectronBrowserContext>>>
       map;
   return *map;
+}
+
+void CheckElectronBrowserContextAllowed() {
+#if BUILDFLAG(ENABLE_FULL_CHROME_EXTENSIONS)
+  CHECK(false)
+      << "ElectronBrowserContext is disabled in the full Chrome extension "
+         "lane. Chrome profile factories require ProfileImpl and must never "
+         "receive an Electron Session BrowserContext.";
+#endif
 }
 
 }  // namespace
@@ -906,6 +916,7 @@ ElectronBrowserContext* ElectronBrowserContext::From(
     const std::string& partition,
     bool in_memory,
     base::DictValue options) {
+  CheckElectronBrowserContextAllowed();
   auto& context = ContextMap()[PartitionKey(partition, in_memory)];
   if (!context) {
     context.reset(new ElectronBrowserContext{std::cref(partition), in_memory,
@@ -923,6 +934,7 @@ ElectronBrowserContext* ElectronBrowserContext::GetDefaultBrowserContext(
 ElectronBrowserContext* ElectronBrowserContext::FromPath(
     const base::FilePath& path,
     base::DictValue options) {
+  CheckElectronBrowserContextAllowed();
   auto& context = ContextMap()[PartitionKey(path)];
   if (!context) {
     context.reset(

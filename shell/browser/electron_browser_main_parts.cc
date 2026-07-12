@@ -63,6 +63,7 @@
 #include "shell/common/logging.h"
 #include "shell/common/node_bindings.h"
 #include "shell/common/node_includes.h"
+#include "shell/common/options_switches.h"
 #include "shell/common/v8_util.h"
 #include "ui/base/idle/idle.h"
 #include "ui/base/l10n/l10n_util.h"
@@ -112,6 +113,7 @@
 #if BUILDFLAG(ENABLE_ELECTRON_EXTENSIONS)
 #if BUILDFLAG(ENABLE_FULL_CHROME_EXTENSIONS)
 #include "chrome/browser/extensions/keyed_services/browser_context_keyed_service_factories.h"
+#include "chrome/browser/profiles/profile.h"
 #include "chrome/common/extensions/chrome_extensions_client.h"
 #endif
 #include "components/keyed_service/content/browser_context_dependency_manager.h"
@@ -453,11 +455,15 @@ void ElectronBrowserMainParts::ToolkitInitialized() {
 }
 
 int ElectronBrowserMainParts::PreMainMessageLoopRun() {
+  auto* command_line = base::CommandLine::ForCurrentProcess();
 #if BUILDFLAG(ENABLE_FULL_CHROME_EXTENSIONS)
-  LOG(FATAL) << "enable_full_chrome_extensions is compile-only provider "
-                "scaffolding. Chrome extension services require a "
-                "ProfileImpl-backed browser lane; attaching them to "
-                "ElectronBrowserContext is unsafe.";
+  const bool run_chrome_profile_smoke =
+      command_line->HasSwitch(electron::switches::kChromeProfileSmoke);
+  CHECK(run_chrome_profile_smoke)
+      << "enable_full_chrome_extensions is an isolated browser lane. Pass "
+         "--chrome-profile-smoke=<absolute-profile-path> while bringing up "
+         "the ProfileImpl substrate; normal Electron Session and "
+         "BrowserWindow creation remain disabled in this build.";
 #endif
 
   // Run user's main script before most things get initialized, so we can have
@@ -484,10 +490,24 @@ int ElectronBrowserMainParts::PreMainMessageLoopRun() {
 
   extensions::EnsureBrowserContextKeyedServiceFactoriesBuilt();
 #if BUILDFLAG(ENABLE_FULL_CHROME_EXTENSIONS)
+  CHECK(ElectronBrowserContext::BrowserContexts().empty())
+      << "An Electron Session created ElectronBrowserContext before Chrome "
+         "profile factory registration. The full-browser lane cannot mix "
+         "BrowserContext ownership models.";
   chrome_extensions::EnsureBrowserContextKeyedServiceFactoriesBuilt();
 #else
   extensions::electron::EnsureBrowserContextKeyedServiceFactoriesBuilt();
 #endif
+#endif
+
+#if BUILDFLAG(ENABLE_FULL_CHROME_EXTENSIONS)
+  const base::FilePath chrome_profile_path =
+      command_line->GetSwitchValuePath(electron::switches::kChromeProfileSmoke);
+  fake_browser_process_->InitializeChromeProfileManager(chrome_profile_path);
+  Profile* chrome_profile =
+      fake_browser_process_->CreateChromeProfileForSmoke(chrome_profile_path);
+  LOG(INFO) << "Chrome profile smoke created ProfileImpl at "
+            << chrome_profile->GetPath();
 #endif
 
 #if BUILDFLAG(ENABLE_BUILTIN_SPELLCHECKER)
@@ -497,8 +517,7 @@ int ElectronBrowserMainParts::PreMainMessageLoopRun() {
   content::WebUIControllerFactory::RegisterFactory(
       ElectronWebUIControllerFactory::GetInstance());
 
-  auto* command_line = base::CommandLine::ForCurrentProcess();
-  if (command_line->HasSwitch(switches::kRemoteDebuggingPipe)) {
+  if (command_line->HasSwitch(::switches::kRemoteDebuggingPipe)) {
     // --remote-debugging-pipe
     auto on_disconnect = base::BindOnce([]() {
       content::GetUIThreadTaskRunner({})->PostTask(
@@ -506,7 +525,7 @@ int ElectronBrowserMainParts::PreMainMessageLoopRun() {
     });
     content::DevToolsAgentHost::StartRemoteDebuggingPipeHandler(
         std::move(on_disconnect));
-  } else if (command_line->HasSwitch(switches::kRemoteDebuggingPort)) {
+  } else if (command_line->HasSwitch(::switches::kRemoteDebuggingPort)) {
     // --remote-debugging-port
     DevToolsManagerDelegate::StartHttpHandler();
   }

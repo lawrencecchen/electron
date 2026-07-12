@@ -50,7 +50,7 @@ revision after every roll. A roll is incomplete until Electron patches apply,
 Linux and Windows compile, the differential contract is regenerated, and the
 full extension suites pass on both platforms.
 
-## Current compile-only scaffold
+## Current guarded bring-up scaffold
 
 `enable_full_chrome_extensions` currently selects these Chromium provider
 shards:
@@ -65,8 +65,9 @@ shards:
 - Chrome's browser-context keyed-service factory registration.
 
 This proves that the provider shards link. It does not produce a usable Chrome
-extension host. Binaries built with the flag intentionally fail at startup so
-the scaffold cannot be mistaken for runtime support.
+extension host. Binaries built with the flag require the profile smoke switch
+and stop at the first unsatisfied Chrome ownership invariant, so the scaffold
+cannot be mistaken for runtime support.
 
 ### Why provider registration is unsafe today
 
@@ -183,6 +184,38 @@ it without adding adapters that later API categories must bypass.
    `ExtensionActionDelegateDesktop`, and `ExtensionPopup`. Test popup focus,
    keyboard input, pointer hit-testing, close behavior, and navigation before
    broadening the API set.
+
+### Profile owner bring-up probe
+
+Full-extension builds accept
+`--chrome-profile-smoke=<absolute-profile-path>`. The probe is the only runtime
+entrypoint enabled while the Chrome profile substrate is incomplete. A build
+without the switch exits before Electron can create a `Session` backed by
+`ElectronBrowserContext` and accidentally hand it to Chrome keyed-service
+factories.
+
+`BrowserProcessImpl` owns the `ProfileManager` slot and destroys it before
+Local State and `SystemNetworkContextManager`. Chromium 152 constructs a
+`BrowserCollectionObserver` inside `ProfileManager`; that observer immediately
+uses the `GlobalBrowserCollection` owned by `GlobalFeatures`. The current probe
+therefore checks that `GlobalFeatures` and its browser collection exist before
+calling the real `ProfileManager` constructor. It exits with an exact invariant
+instead of dereferencing Electron's current null `GetFeatures()` result.
+
+The full-browser build also rejects `ElectronBrowserContext` construction and
+checks that no Electron Session context exists before registering Chrome
+profile factories. These invariants make it impossible to pass the wrong
+BrowserContext type through Chrome's unchecked `Profile` casts while the new
+lane is under construction.
+
+The next source-level prerequisite is to extract `global_features.cc` from the
+Chrome `//chrome/browser:core` monolith into an embeddable implementation target.
+The Electron `BrowserProcessImpl` can then own the result of
+`GlobalFeatures::CreateGlobalFeatures()` and call `Init()`. The following
+ProfileImpl prerequisite is an initialized `ChromeBrowserPolicyConnector`;
+`ProfileImpl::LoadPrefsForNormalStartup()` unconditionally uses its schema
+registry and policy service. Neither prerequisite may be replaced with null
+services or a partial `Profile` adapter.
 
 The likely minimum GN dependency set includes:
 

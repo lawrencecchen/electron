@@ -47,6 +47,13 @@
 #include "shell/common/electron_paths.h"
 #include "shell/common/thread_restrictions.h"
 
+#if BUILDFLAG(ENABLE_FULL_CHROME_EXTENSIONS)
+#include "chrome/browser/global_features.h"
+#include "chrome/browser/policy/chrome_browser_policy_connector.h"
+#include "chrome/browser/profiles/profile.h"
+#include "chrome/browser/profiles/profile_manager.h"
+#endif
+
 #if BUILDFLAG(ENABLE_PRINTING)
 #include "chrome/browser/printing/print_job_manager.h"
 #endif
@@ -199,6 +206,15 @@ void BrowserProcessImpl::PreMainMessageLoopRun() {
 }
 
 void BrowserProcessImpl::PostMainMessageLoopRun() {
+  is_shutting_down_ = true;
+
+#if BUILDFLAG(ENABLE_FULL_CHROME_EXTENSIONS)
+  // Profiles own BrowserContext keyed services and storage partitions. Tear
+  // them down while the UI thread, local state, and network service still
+  // exist, matching Chrome's BrowserProcessImpl ordering.
+  chrome_profile_manager_.reset();
+#endif
+
   if (local_state_)
     local_state_->CommitPendingWrite();
 
@@ -206,8 +222,14 @@ void BrowserProcessImpl::PostMainMessageLoopRun() {
   SystemNetworkContextManager::DeleteInstance();
 }
 
+void BrowserProcessImpl::PostDestroyThreads() {
+#if BUILDFLAG(ENABLE_FULL_CHROME_EXTENSIONS)
+  DCHECK(!chrome_profile_manager_);
+#endif
+}
+
 bool BrowserProcessImpl::IsShuttingDown() {
-  return false;
+  return is_shutting_down_;
 }
 
 metrics_services_manager::MetricsServicesManager*
@@ -221,8 +243,66 @@ metrics::MetricsService* BrowserProcessImpl::metrics_service() {
 }
 
 ProfileManager* BrowserProcessImpl::profile_manager() {
+#if BUILDFLAG(ENABLE_FULL_CHROME_EXTENSIONS)
+  return chrome_profile_manager_.get();
+#else
   return nullptr;
+#endif
 }
+
+#if BUILDFLAG(ENABLE_FULL_CHROME_EXTENSIONS)
+void BrowserProcessImpl::InitializeChromeProfileManager(
+    const base::FilePath& chrome_profile_path) {
+  DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
+  CHECK(!chrome_profile_path.empty());
+  CHECK(chrome_profile_path.IsAbsolute())
+      << "--chrome-profile-smoke requires an absolute profile path";
+  CHECK(!chrome_profile_manager_)
+      << "Chrome ProfileManager must have exactly one BrowserProcess owner";
+
+  // Chromium 152's ProfileManager contains a BrowserCollectionObserver whose
+  // constructor immediately observes GlobalBrowserCollection::GetInstance().
+  // Building it while Electron's BrowserProcessImpl::GetFeatures() is null is
+  // a deterministic null dereference. Keep this CHECK ahead of the constructor
+  // so the incomplete lane cannot become a crash-prone partial integration.
+  GlobalFeatures* features = GetFeatures();
+  CHECK(features && features->global_browser_collection())
+      << "Chrome profile runtime requires BrowserProcessImpl to own and "
+         "initialize Chromium GlobalFeatures before constructing "
+         "ProfileManager. Next integration step: extract global_features.cc "
+         "from //chrome/browser:core into an embeddable target, then call "
+         "GlobalFeatures::CreateGlobalFeatures() and Init().";
+
+  chrome_profile_user_data_dir_ = chrome_profile_path.DirName();
+  chrome_profile_manager_ =
+      std::make_unique<ProfileManager>(chrome_profile_user_data_dir_);
+  CHECK_EQ(chrome_profile_manager_->user_data_dir(),
+           chrome_profile_user_data_dir_);
+}
+
+Profile* BrowserProcessImpl::CreateChromeProfileForSmoke(
+    const base::FilePath& chrome_profile_path) {
+  DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
+  CHECK(chrome_profile_manager_);
+  CHECK_EQ(chrome_profile_path.DirName(), chrome_profile_user_data_dir_);
+
+  // ProfileImpl::LoadPrefsForNormalStartup() unconditionally dereferences the
+  // ChromeBrowserPolicyConnector to build its schema registry. Never replace
+  // this with a null policy service or a partial Profile adapter.
+  auto* connector = browser_policy_connector();
+  CHECK(connector && connector->GetPolicyService())
+      << "Chrome ProfileImpl creation requires an initialized "
+         "ChromeBrowserPolicyConnector. It must be created before Local State "
+         "and initialized with Local State plus the system URL loader before "
+         "the smoke probe may call ProfileManager::GetProfile().";
+
+  Profile* profile = chrome_profile_manager_->GetProfile(chrome_profile_path);
+  CHECK(profile) << "Chromium failed to create the smoke ProfileImpl at "
+                 << chrome_profile_path;
+  CHECK_EQ(profile->GetPath(), chrome_profile_path);
+  return profile;
+}
+#endif
 
 PrefService* BrowserProcessImpl::local_state() {
   DCHECK(local_state_.get());
