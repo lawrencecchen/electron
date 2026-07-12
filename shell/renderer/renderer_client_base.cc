@@ -240,6 +240,9 @@ void RendererClientBase::RenderThreadStarted() {
   extensions_client_ = std::make_unique<ElectronExtensionsClient>();
 #endif
   extensions::ExtensionsClient::Set(extensions_client_.get());
+#if BUILDFLAG(ENABLE_FULL_CHROME_EXTENSIONS)
+  extensions_client_->Initialize();
+#endif
 
   extensions_renderer_client_ =
       std::make_unique<ElectronExtensionsRendererClient>();

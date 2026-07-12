@@ -468,6 +468,9 @@ int ElectronBrowserMainParts::PreMainMessageLoopRun() {
   extensions_client_ = std::make_unique<ElectronExtensionsClient>();
 #endif
   extensions::ExtensionsClient::Set(extensions_client_.get());
+#if BUILDFLAG(ENABLE_FULL_CHROME_EXTENSIONS)
+  extensions_client_->Initialize();
+#endif
 
   // BrowserContextKeyedAPIServiceFactories require an ExtensionsBrowserClient.
   extensions_browser_client_ =
