@@ -860,6 +860,14 @@ source_set("electron_lib") {
       "//extensions/common:core_api_provider",
       "//extensions/renderer",
     ]
+
+    if (enable_full_chrome_extensions) {
+      deps += [
+        "//chrome/browser/extensions",
+        "//chrome/common/extensions",
+        "//chrome/renderer/extensions",
+      ]
+    }
   }
 
   if (enable_pdf) {

@@ -1,0 +1,4 @@
+import("//electron/build/args/testing.gn")
+
+enable_full_chrome_extensions = true
+

@@ -14,6 +14,10 @@ declare_args() {
   # Enable Chrome extensions support.
   enable_electron_extensions = true
 
+  # Enable Chrome's complete extension platform instead of Electron's
+  # intentionally reduced extension API surface.
+  enable_full_chrome_extensions = false
+
   # Enable Spellchecker support
   enable_builtin_spellchecker = true
 

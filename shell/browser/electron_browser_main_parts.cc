@@ -110,6 +110,10 @@
 #endif
 
 #if BUILDFLAG(ENABLE_ELECTRON_EXTENSIONS)
+#if BUILDFLAG(ENABLE_FULL_CHROME_EXTENSIONS)
+#include "chrome/browser/extensions/browser_context_keyed_service_factories.h"
+#include "chrome/common/extensions/chrome_extensions_client.h"
+#endif
 #include "components/keyed_service/content/browser_context_dependency_manager.h"
 #include "extensions/browser/browser_context_keyed_service_factories.h"
 #include "extensions/common/extension_api.h"
@@ -458,7 +462,11 @@ int ElectronBrowserMainParts::PreMainMessageLoopRun() {
   url::LockSchemeRegistries();
 
 #if BUILDFLAG(ENABLE_ELECTRON_EXTENSIONS)
+#if BUILDFLAG(ENABLE_FULL_CHROME_EXTENSIONS)
+  extensions_client_ = std::make_unique<extensions::ChromeExtensionsClient>();
+#else
   extensions_client_ = std::make_unique<ElectronExtensionsClient>();
+#endif
   extensions::ExtensionsClient::Set(extensions_client_.get());
 
   // BrowserContextKeyedAPIServiceFactories require an ExtensionsBrowserClient.
@@ -468,7 +476,11 @@ int ElectronBrowserMainParts::PreMainMessageLoopRun() {
   extensions::ExtensionsBrowserClient::Set(extensions_browser_client_.get());
 
   extensions::EnsureBrowserContextKeyedServiceFactoriesBuilt();
+#if BUILDFLAG(ENABLE_FULL_CHROME_EXTENSIONS)
+  chrome_extensions::EnsureBrowserContextKeyedServiceFactoriesBuilt();
+#else
   extensions::electron::EnsureBrowserContextKeyedServiceFactoriesBuilt();
+#endif
 #endif
 
 #if BUILDFLAG(ENABLE_BUILTIN_SPELLCHECKER)

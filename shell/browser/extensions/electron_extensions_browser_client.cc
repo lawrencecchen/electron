@@ -10,7 +10,12 @@
 #include "base/functional/bind.h"
 #include "base/memory/ptr_util.h"
 #include "base/path_service.h"
+#include "electron/buildflags/buildflags.h"
 #include "chrome/browser/extensions/chrome_url_request_util.h"
+#if BUILDFLAG(ENABLE_FULL_CHROME_EXTENSIONS)
+#include "chrome/browser/extensions/api/chrome_extensions_api_client.h"
+#include "chrome/browser/extensions/chrome_extensions_browser_api_provider.h"
+#endif
 #include "chrome/common/chrome_paths.h"
 #include "components/version_info/version_info.h"
 #include "content/public/browser/browser_context.h"
@@ -63,8 +68,13 @@ ElectronExtensionsBrowserClient::ElectronExtensionsBrowserClient()
           std::make_unique<extensions::SafeBrowsingDelegate>()) {
   AddAPIProvider(
       std::make_unique<extensions::CoreExtensionsBrowserAPIProvider>());
+#if BUILDFLAG(ENABLE_FULL_CHROME_EXTENSIONS)
+  AddAPIProvider(
+      std::make_unique<extensions::ChromeExtensionsBrowserAPIProvider>());
+#else
   AddAPIProvider(
       std::make_unique<extensions::ElectronExtensionsBrowserAPIProvider>());
+#endif
 
   // Electron does not have a concept of channel, so leave UNKNOWN to
   // enable all channel-dependent extension APIs.
@@ -76,7 +86,11 @@ ElectronExtensionsBrowserClient::~ElectronExtensionsBrowserClient() = default;
 void ElectronExtensionsBrowserClient::Init() {
   process_manager_delegate_ =
       std::make_unique<extensions::ElectronProcessManagerDelegate>();
+#if BUILDFLAG(ENABLE_FULL_CHROME_EXTENSIONS)
+  api_client_ = std::make_unique<extensions::ChromeExtensionsAPIClient>();
+#else
   api_client_ = std::make_unique<extensions::ElectronExtensionsAPIClient>();
+#endif
   resource_manager_ =
       std::make_unique<extensions::ElectronComponentExtensionResourceManager>();
 }

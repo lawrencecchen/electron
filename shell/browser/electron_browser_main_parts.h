@@ -29,6 +29,10 @@ class Screen;
 class ScopedNativeScreen;
 }  // namespace display
 
+namespace extensions {
+class ExtensionsClient;
+}  // namespace extensions
+
 #if defined(USE_AURA)
 namespace wm {
 class WMState;
@@ -60,7 +64,6 @@ class JavascriptEnvironment;
 class NodeBindings;
 
 #if BUILDFLAG(ENABLE_ELECTRON_EXTENSIONS)
-class ElectronExtensionsClient;
 class ElectronExtensionsBrowserClient;
 #endif
 
@@ -174,7 +177,7 @@ class ElectronBrowserMainParts : public content::BrowserMainParts {
   std::unique_ptr<IconManager> icon_manager_;
 
 #if BUILDFLAG(ENABLE_ELECTRON_EXTENSIONS)
-  std::unique_ptr<ElectronExtensionsClient> extensions_client_;
+  std::unique_ptr<extensions::ExtensionsClient> extensions_client_;
   std::unique_ptr<ElectronExtensionsBrowserClient> extensions_browser_client_;
 #endif
 
