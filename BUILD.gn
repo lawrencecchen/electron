@@ -157,7 +157,9 @@ if (enable_electron_extensions) {
 
 if (enable_full_chrome_extensions) {
   assert(enable_electron_extensions,
-         "Full Chrome extension support requires enable_electron_extensions=true")
+         "Chrome extension provider scaffolding requires enable_electron_extensions=true")
+  assert(!is_official_build,
+         "Chrome extension provider scaffolding must not be shipped")
 }
 
 config("branding") {

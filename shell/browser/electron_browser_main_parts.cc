@@ -453,6 +453,13 @@ void ElectronBrowserMainParts::ToolkitInitialized() {
 }
 
 int ElectronBrowserMainParts::PreMainMessageLoopRun() {
+#if BUILDFLAG(ENABLE_FULL_CHROME_EXTENSIONS)
+  LOG(FATAL) << "enable_full_chrome_extensions is compile-only provider "
+                "scaffolding. Chrome extension services require a "
+                "ProfileImpl-backed browser lane; attaching them to "
+                "ElectronBrowserContext is unsafe.";
+#endif
+
   // Run user's main script before most things get initialized, so we can have
   // a chance to setup everything.
   node_bindings_->PrepareEmbedThread();

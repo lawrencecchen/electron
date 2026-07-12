@@ -14,8 +14,10 @@ declare_args() {
   # Enable Chrome extensions support.
   enable_electron_extensions = true
 
-  # Enable Chrome's complete extension platform instead of Electron's
-  # intentionally reduced extension API surface.
+  # Compile Chrome extension provider shards for the full-platform experiment.
+  # This is compile-only scaffolding: the Electron BrowserContext is not a
+  # Chrome Profile, so binaries built with this flag intentionally fail at
+  # startup until the ProfileImpl-backed browser lane is implemented.
   enable_full_chrome_extensions = false
 
   # Enable Spellchecker support

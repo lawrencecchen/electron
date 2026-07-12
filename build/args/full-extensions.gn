@@ -1,4 +1,5 @@
 import("//electron/build/args/testing.gn")
 
+# Compile/link validation only. The resulting binary intentionally fails at
+# startup until the ProfileImpl-backed Chrome browser lane is implemented.
 enable_full_chrome_extensions = true
-
