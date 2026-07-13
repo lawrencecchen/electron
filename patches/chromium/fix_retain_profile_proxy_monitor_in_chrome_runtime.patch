@@ -1,0 +1,106 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: cmux-lawrence <cmux-lawrence@users.noreply.github.com>
+Date: Mon, 13 Jul 2026 06:56:07 +0000
+Subject: fix: retain profile proxy monitor in Chrome runtime
+
+Electron normally uses the PrefService-backed proxy monitor, but the isolated Chrome profile runtime needs Chromium profile-scoped proxy policy and extension error routing. Export the profile-runtime define from the public net target so every header consumer sees one consistent constructor surface.
+
+diff --git a/chrome/browser/net/BUILD.gn b/chrome/browser/net/BUILD.gn
+index dc92146bb0d4eeeab725417df017d75f96156878..6f59698883a20f3cb308ffad6d193f12e489a54f 100644
+--- a/chrome/browser/net/BUILD.gn
++++ b/chrome/browser/net/BUILD.gn
+@@ -26,6 +26,10 @@ proto_library("key_pinning_proto") {
+   ]
+ }
+ 
++config("electron_chrome_profile_runtime") {
++  defines = [ "ENABLE_ELECTRON_CHROME_PROFILE_RUNTIME" ]
++}
++
+ source_set("net") {
+   public = [
+     "cert_verifier_service_time_updater.h",
+@@ -89,6 +93,10 @@ source_set("net") {
+     "//url",
+   ]
+ 
++  if (enable_electron_chrome_profile_runtime) {
++    public_configs = [ ":electron_chrome_profile_runtime" ]
++  }
++
+   if (!is_android && !is_chromeos) {
+     public += [ "disk_cache_dir_policy_handler.h" ]
+   }
+diff --git a/chrome/browser/net/proxy_config_monitor.cc b/chrome/browser/net/proxy_config_monitor.cc
+index d0e3e0dcf9ac9b6ae6795e716c205f7bdef12ec7..ab443a4f215bd6fdd44d42d3bf68783a05f056f4 100644
+--- a/chrome/browser/net/proxy_config_monitor.cc
++++ b/chrome/browser/net/proxy_config_monitor.cc
+@@ -11,7 +11,7 @@
+ #include "build/chromeos_buildflags.h"
+ #include "chrome/browser/browser_process.h"
+ #include "chrome/browser/net/proxy_service_factory.h"
+-#if 0
++#if defined(ENABLE_ELECTRON_CHROME_PROFILE_RUNTIME)
+ #include "chrome/browser/policy/profile_policy_connector.h"
+ #include "chrome/browser/profiles/profile.h"
+ #endif
+@@ -24,13 +24,14 @@
+ #include "chrome/browser/ash/profiles/profile_helper.h"
+ #endif  // BUILDFLAG(IS_CHROMEOS)
+ 
+-#if 0
++#if BUILDFLAG(ENABLE_EXTENSIONS_CORE) && \
++    defined(ENABLE_ELECTRON_CHROME_PROFILE_RUNTIME)
+ #include "chrome/browser/extensions/api/proxy/proxy_api.h"
+-#endif // BUILDFLAG(ENABLE_EXTENSIONS_CORE)
++#endif
+ 
+ using content::BrowserThread;
+ 
+-#if 0
++#if defined(ENABLE_ELECTRON_CHROME_PROFILE_RUNTIME)
+ ProxyConfigMonitor::ProxyConfigMonitor(Profile* profile) {
+   DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
+   DCHECK(profile);
+@@ -141,7 +142,7 @@ void ProxyConfigMonitor::OnLazyProxyConfigPoll() {
+ void ProxyConfigMonitor::OnPACScriptError(int32_t line_number,
+                                           const std::string& details) {
+   DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
+-#if 0
++#if defined(ENABLE_ELECTRON_CHROME_PROFILE_RUNTIME)
+   extensions::ProxyEventRouter::GetInstance()->OnPACScriptError(
+       profile_, line_number, base::UTF8ToUTF16(details));
+ #endif
+@@ -159,7 +160,7 @@ void ProxyConfigMonitor::OnRequestMaybeFailedDueToProxySettings(
+     return;
+   }
+ 
+-#if 0
++#if defined(ENABLE_ELECTRON_CHROME_PROFILE_RUNTIME)
+   extensions::ProxyEventRouter::GetInstance()->OnProxyError(profile_,
+                                                             net_error);
+ #endif
+diff --git a/chrome/browser/net/proxy_config_monitor.h b/chrome/browser/net/proxy_config_monitor.h
+index c81481a4451ff50b6ace5372a68b8615819affb3..11c4d23207edbca9a9d52958522f8592ee6cc203 100644
+--- a/chrome/browser/net/proxy_config_monitor.h
++++ b/chrome/browser/net/proxy_config_monitor.h
+@@ -40,7 +40,7 @@ class ProxyConfigMonitor : public net::ProxyConfigService::Observer,
+ 
+ {
+  public:
+-#if 0
++#if defined(ENABLE_ELECTRON_CHROME_PROFILE_RUNTIME)
+   // Creates a ProxyConfigMonitor that gets proxy settings from |profile| and
+   // watches for changes. The created ProxyConfigMonitor must be destroyed
+   // before |profile|.
+@@ -95,7 +95,9 @@ class ProxyConfigMonitor : public net::ProxyConfigService::Observer,
+ 
+ #if BUILDFLAG(ENABLE_EXTENSIONS_CORE)
+   mojo::ReceiverSet<network::mojom::ProxyErrorClient> error_receiver_set_;
+-  // raw_ptr<Profile> profile_ = nullptr;
++#if defined(ENABLE_ELECTRON_CHROME_PROFILE_RUNTIME)
++  raw_ptr<Profile> profile_ = nullptr;
++#endif
+ #endif  // BUILDFLAG(ENABLE_EXTENSIONS_CORE)
+ };
+ 
