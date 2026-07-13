@@ -1,19 +1,12 @@
-From 0e2473d54e1b7392153320be1d857c1537f583fc Mon Sep 17 00:00:00 2001
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: cmux-lawrence <cmux-lawrence@cmux-lawrences-Mac-mini.local>
 Date: Sun, 12 Jul 2026 23:40:12 -0700
-Subject: [PATCH] fix: support cppgc-owned microtask queues
+Subject: fix: support cppgc-owned microtask queues
 
-V8_CPPGC_MICROTASK_QUEUE changes MicrotaskQueue::New() from unique
-ownership to a cppgc-managed raw pointer. Keep the queue alive with
-cppgc::Persistent in that configuration while preserving std::unique_ptr for
-Node's default V8 build.
----
- src/node_contextify.cc |  6 ++----
- src/node_contextify.h  | 24 +++++++++++++++++++++---
- 2 files changed, 23 insertions(+), 7 deletions(-)
+V8_CPPGC_MICROTASK_QUEUE changes MicrotaskQueue::New() from unique ownership to a cppgc-managed raw pointer. Keep the queue alive with cppgc::Persistent in that configuration while preserving std::unique_ptr for Node's default V8 build.
 
 diff --git a/src/node_contextify.cc b/src/node_contextify.cc
-index 808e28db..29506dd9 100644
+index 808e28db0f4c1d410fdf97013eaa65ed0c15fd78..29506dd942d24ce49f59ed06185a83fffccfe7c9 100644
 --- a/src/node_contextify.cc
 +++ b/src/node_contextify.cc
 @@ -127,7 +127,7 @@ ContextifyContext* ContextifyContext::New(Environment* env,
@@ -37,7 +30,7 @@ index 808e28db..29506dd9 100644
  
    context_.Reset(env->isolate(), v8_context);
 diff --git a/src/node_contextify.h b/src/node_contextify.h
-index 1066633d..b809022c 100644
+index 1066633daf65d430b5f46e1b226ee3cf70979c33..b809022c95478897e4fb9703dbeb929c8ac06332 100644
 --- a/src/node_contextify.h
 +++ b/src/node_contextify.h
 @@ -13,12 +13,30 @@ class ExternalReferenceRegistry;
@@ -90,6 +83,3 @@ index 1066633d..b809022c 100644
  };
  
  class ContextifyScript final : CPPGC_MIXIN(ContextifyScript) {
--- 
-2.50.1 (Apple Git-155)
-
