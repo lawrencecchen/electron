@@ -1,0 +1,101 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Lawrence Chen <lawrence@manaflow.com>
+Date: Mon, 13 Jul 2026 11:03:19 +0000
+Subject: fix: restore profile keyed-service selection in Electron
+
+---
+ .../browser/profiles/profile_keyed_service_factory.cc  |  6 ++++--
+ chrome/browser/profiles/profile_selections.cc          | 10 ++++++----
+ chrome/common/BUILD.gn                                 |  1 +
+ 3 files changed, 11 insertions(+), 6 deletions(-)
+
+diff --git a/chrome/browser/profiles/profile_keyed_service_factory.cc b/chrome/browser/profiles/profile_keyed_service_factory.cc
+index 85764a533585d..a3ddebee2262c 100644
+--- a/chrome/browser/profiles/profile_keyed_service_factory.cc
++++ b/chrome/browser/profiles/profile_keyed_service_factory.cc
+@@ -5,6 +5,7 @@
+ #include "chrome/browser/profiles/profile_keyed_service_factory.h"
+ 
+ #include "chrome/browser/profiles/profile.h"
++#include "chrome/common/buildflags.h"
+ #include "components/keyed_service/content/browser_context_dependency_manager.h"
+ 
+ ProfileKeyedServiceFactory::ProfileKeyedServiceFactory(const char* name)
+@@ -22,9 +23,10 @@ ProfileKeyedServiceFactory::~ProfileKeyedServiceFactory() = default;
+ 
+ content::BrowserContext* ProfileKeyedServiceFactory::GetBrowserContextToUse(
+     content::BrowserContext* context) const {
+-  return context;
+-#if 0
++#if BUILDFLAG(ENABLE_ELECTRON_CHROME_PROFILE_RUNTIME)
+   Profile* profile = Profile::FromBrowserContext(context);
+   return profile_selections_.ApplyProfileSelection(profile);
++#else
++  return context;
+ #endif
+ }
+diff --git a/chrome/browser/profiles/profile_selections.cc b/chrome/browser/profiles/profile_selections.cc
+index 6b77c57fccc46..5e4e7eae78474 100644
+--- a/chrome/browser/profiles/profile_selections.cc
++++ b/chrome/browser/profiles/profile_selections.cc
+@@ -6,6 +6,7 @@
+ 
+ #include "base/memory/ptr_util.h"
+ #include "chrome/browser/profiles/profile.h"
++#include "chrome/common/buildflags.h"
+ #include "components/profile_metrics/browser_profile_type.h"
+ 
+ #if BUILDFLAG(IS_CHROMEOS)
+@@ -13,7 +14,7 @@
+ #endif  // BUILDFLAG(IS_CHROMEOS)
+ 
+ bool AreKeyedServicesDisabledForProfileByDefault(const Profile* profile) {
+-#if 0
++#if BUILDFLAG(ENABLE_ELECTRON_CHROME_PROFILE_RUNTIME)
+   // By default disable all services for System Profile.
+   // Even though having no services is also the default value for Guest Profile,
+   // this is not really the case in practice because a lot of Service Factories
+@@ -105,7 +106,7 @@ ProfileSelections ProfileSelections::BuildRedirectedInIncognito() {
+ }
+ 
+ Profile* ProfileSelections::ApplyProfileSelection(Profile* profile) const {
+-#if 0
++#if BUILDFLAG(ENABLE_ELECTRON_CHROME_PROFILE_RUNTIME)
+   CHECK(profile);
+ 
+   ProfileSelection selection = GetProfileSelection(profile);
+@@ -137,7 +138,7 @@ ProfileSelection ProfileSelections::GetProfileSelection(
+   }
+ #endif  // BUILDFLAG(IS_CHROMEOS)
+ 
+-#if 0
++#if BUILDFLAG(ENABLE_ELECTRON_CHROME_PROFILE_RUNTIME)
+   // Treat other off the record profiles as Incognito (primary otr) Profiles.
+   if (profile->IsRegularProfile() || profile->IsIncognitoProfile() ||
+       profile_metrics::GetBrowserProfileType(profile) ==
+@@ -154,8 +155,9 @@ ProfileSelection ProfileSelections::GetProfileSelection(
+   }
+ 
+   NOTREACHED();
+-#endif
++#else
+   return ProfileSelection::kNone;
++#endif
+ }
+ 
+ void ProfileSelections::SetProfileSelectionForRegular(
+diff --git a/chrome/common/BUILD.gn b/chrome/common/BUILD.gn
+index 5f7275d0b0460..12f6d298045b1 100644
+--- a/chrome/common/BUILD.gn
++++ b/chrome/common/BUILD.gn
+@@ -55,6 +55,7 @@ buildflag_header("buildflags") {
+     "ENABLE_BACKGROUND_CONTENTS=$enable_background_contents",
+     "ENABLE_CHROME_NOTIFICATIONS=$enable_chrome_notifications",
+     "ENABLE_DOWNGRADE_PROCESSING=$enable_downgrade_processing",
++    "ENABLE_ELECTRON_CHROME_PROFILE_RUNTIME=$enable_electron_chrome_profile_runtime",
+     "ENABLE_HANGOUT_SERVICES_EXTENSION=$enable_hangout_services_extension",
+     "ENABLE_PDF_SAVE_TO_DRIVE=$enable_pdf_save_to_drive",
+     "ENABLE_SERVICE_DISCOVERY=$enable_service_discovery",
+-- 
+2.43.0
+
