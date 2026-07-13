@@ -5,8 +5,8 @@ Electron `DEPS`. It supplies the expected result for extension differential
 tests and a runnable reference for the Profile-backed Electron browser lane.
 It does not route Chrome APIs through `ElectronBrowserContext`.
 
-The current pin is Chromium 152.0.7946.0 at
-`204b1fd0d2d1ae8eac84fa6e3169e198b159d5d2`. The launcher fails when the
+The current pin is Chromium 152.0.7947.0 at
+`18aeeb51dd7e909510d599bee93599bf91ef9ef9`. The launcher fails when the
 contract, `DEPS`, source checkout ancestry, or runtime binary version differs.
 
 ## Build
@@ -51,7 +51,7 @@ npm run oracle:webui:launch -- --chromium-root ../../..
 The launcher performs these checks before reporting ready:
 
 1. `DEPS`, the generated conformance contract, and the Chromium checkout share
-   version 152.0.7946.0 and its pinned base revision.
+   version 152.0.7947.0 and its pinned base revision.
 2. The runtime DevTools product reports that exact four-part version.
 3. A `chrome://webui-browser/` DevTools target proves that the
    `WebUIBrowserWindow` top chrome was created.

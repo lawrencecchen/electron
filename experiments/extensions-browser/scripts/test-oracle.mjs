@@ -62,9 +62,9 @@ assert.equal(behavior[0].evidenceCandidate, true)
 assert.equal(behavior[0].coverage, 'partial')
 assert.equal(behaviorDifferences({ behavior: behavior[0].chromium ? [behavior[0].chromium] : [] }, { behavior: [behavior[0].electron] }, false)[0].evidenceCandidate, false)
 
-assert.equal(chromiumVersionFromVersionFile('MAJOR=152\nMINOR=0\nBUILD=7946\nPATCH=0\n'), '152.0.7946.0')
-assert.ok(compareChromiumVersions('152.0.7945.0', '152.0.7946.0') < 0)
-assert.equal(newestTaggedVersion({ '152.0.7944.0': {}, '152.0.7945.0': {}, '152.0.7946.0': {}, '152.0.7945.1': {}, '151.0.1.0': {} }, '152'), '152.0.7946.0')
+assert.equal(chromiumVersionFromVersionFile('MAJOR=152\nMINOR=0\nBUILD=7947\nPATCH=0\n'), '152.0.7947.0')
+assert.ok(compareChromiumVersions('152.0.7946.0', '152.0.7947.0') < 0)
+assert.equal(newestTaggedVersion({ '152.0.7945.0': {}, '152.0.7946.0': {}, '152.0.7947.0': {}, '152.0.7946.1': {}, '151.0.1.0': {} }, '152'), '152.0.7947.0')
 
 await fs.rm(fixtureRoot, { recursive: true, force: true })
 console.log(JSON.stringify({ chromium: contract.chromium, contexts: Object.keys(matrix.contexts), extensionIds: matrix.extensionIds }, null, 2))

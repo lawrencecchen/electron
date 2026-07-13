@@ -18,7 +18,7 @@ assert.deepEqual(parseDevToolsActivePort('43125\n/devtools/browser/example\n'), 
   port: 43125
 })
 assert.throws(() => parseDevToolsActivePort('0\n/devtools/browser/example\n'), /invalid port/)
-assert.equal(parseBrowserRevision('@204b1fd0d2d1ae8eac84fa6e3169e198b159d5d2'), '204b1fd0d2d1ae8eac84fa6e3169e198b159d5d2')
+assert.equal(parseBrowserRevision('@18aeeb51dd7e909510d599bee93599bf91ef9ef9'), '18aeeb51dd7e909510d599bee93599bf91ef9ef9')
 assert.throws(() => parseBrowserRevision('@not-a-revision'), /invalid source revision/)
 
 const report = {
@@ -34,7 +34,7 @@ assert.deepEqual(matchFixtures([{
   label: 'fixture',
   manifestVersion: 3,
   version: '1.2.3'
-}], report.extensions, '152.0.7946.0'), [{
+}], report.extensions, '152.0.7947.0'), [{
   displayName: 'Fixture',
   enabled: true,
   expectedStatus: 'loaded',
@@ -55,7 +55,7 @@ const mv2Result = matchFixtures([{
   label: 'ublock',
   manifestVersion: 2,
   version: '1.72.2'
-}], [], '152.0.7946.0')[0]
+}], [], '152.0.7947.0')[0]
 assert.equal(mv2Result.status, 'not-loaded')
 assert.equal(mv2Result.expectedStatus, 'not-loaded')
 assert.equal(mv2Result.expectationMet, true)
