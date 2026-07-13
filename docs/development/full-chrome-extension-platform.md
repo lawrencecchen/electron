@@ -62,7 +62,11 @@ shards:
 - `extensions::ChromeExtensionsAPIClient` for Chrome browser delegates;
 - `extensions::ChromeExtensionsRendererAPIProvider` for renderer hooks and
   generated JavaScript sources;
-- Chrome's browser-context keyed-service factory registration.
+- Chrome's browser-context keyed-service factory registration;
+- a real `ProfileManager` and `ProfileImpl` smoke owner with policy, Local
+  State, network, `GlobalFeatures`, and ordered teardown;
+- stock `ProfileSelections` routing for keyed services in the isolated profile
+  lane, while normal Electron retains its existing BrowserContext behavior.
 
 This proves that the provider shards link. It does not produce a usable Chrome
 extension host. Binaries built with the flag require the profile smoke switch
@@ -82,8 +86,8 @@ The missing substrate extends beyond the cast:
 
 - `ElectronExtensionSystem::extension_service()`, its state, rules, and dynamic
   user-script stores, its content verifier, and its update path are absent;
-- `BrowserProcessImpl::profile_manager()` and many global Chrome services return
-  null;
+- many global Chrome services outside the profile-smoke dependency closure
+  still return null;
 - `session.loadExtension()` assumes `ElectronExtensionSystem`;
 - Electron tabs are independent `WebContents` objects, while Chrome APIs expect
   `Browser`, `TabStripModel`, window-controller registration, and `Profile`;
@@ -225,8 +229,10 @@ removes both the BrowserContext cast and a cross-translation-unit class-layout
 collision.
 
 After a successful profile creation the probe posts a clean quit, exercising
-ProfileManager, policy, GlobalFeatures, Local State, and network teardown. The
-next unsafe owner boundary is the first Chrome-owned tab. The smoke lane has
+ProfileManager, policy, GlobalFeatures, Local State, and network teardown. It
+logs completion only after the ProfileManager reset, so lifecycle stress can
+distinguish profile creation from complete teardown. The next unsafe owner
+boundary is the first Chrome-owned tab. The smoke lane has
 explicit guards in `GetMediaDeviceIDSalt()` and the Electron fallback in
 `WillCreateURLLoaderFactory()`; neither may cast a Profile to
 `ElectronBrowserContext`. The profile-backed window slice must route those

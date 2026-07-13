@@ -3,10 +3,10 @@
 ## Decision
 
 Use Electron for window composition and web UI, but keep terminal state,
-terminal I/O, glyph shaping, and GPU rendering inside libghostty. Validate the
-macOS product shape with the Node-API spike in
-`experiments/libghostty-embed`. Do not begin the cmux migration until Ghostty
-has a platform-neutral embedded render target that works on Linux and Windows.
+terminal I/O, glyph shaping, and GPU rendering inside libghostty. Native child
+surface demos now validate this boundary on macOS, Linux X11, and Windows. Do
+not begin the cmux migration until the compositor-texture path also covers
+Wayland and hardware-accelerated Windows.
 
 The permanent Electron change should be a small `GhosttyView` wrapper around a
 generic native or external-texture view. Maintaining a broad Chromium fork for
@@ -17,21 +17,21 @@ terminal behavior would make every Chromium roll part of the terminal runtime.
 | Layer | macOS | Linux | Windows |
 | --- | --- | --- | --- |
 | Electron parent handle | `NSView*` | X11 `Window`; no portable Wayland child handle | `HWND` |
-| Ghostty embedded surface | `GHOSTTY_PLATFORM_MACOS` | None | None |
-| Ghostty renderer | Metal embedded target | OpenGL through GTK4 only | No embedded target |
+| Ghostty embedded surface | `GHOSTTY_PLATFORM_MACOS` | Embedder-owned OpenGL callbacks | Embedder-owned OpenGL callbacks |
+| Ghostty renderer | Metal embedded target | OpenGL through GLX | OpenGL through WGL |
 | Terminal process backend | PTY | PTY | ConPTY code exists |
-| Result today | Full-render spike is viable | Blocked on render-target ABI | Blocked on render-target ABI |
+| Result today | Working native demo | Working X11 demo | Working demo; hardware WGL pass pending |
 
-Ghostty's current `src/renderer/OpenGL.zig` says the embedded OpenGL branch only
-exists so libghostty compiles and is broken for rendering. Its C header exposes
-only macOS and iOS platform tags. The GTK4 surface cannot be inserted directly
-into Electron's Chromium Views/Aura tree, and GTK3 and GTK4 must not be treated
-as interchangeable widget ABIs.
+The OpenGL ABI keeps platform windowing outside Ghostty. The Linux addon owns
+its X11 child, GLX drawable, and context. The Windows addon owns its child HWND,
+device context, and WGL context. Ghostty makes the supplied context current,
+loads GL functions, renders, updates the live viewport, and calls the host's
+swap callback.
 
-## Required Ghostty API
+## Ghostty OpenGL API
 
-Add an embedder-owned render target instead of adding Electron knowledge to
-Ghostty. One possible C boundary is:
+The fork adds an embedder-owned render target instead of adding Electron
+knowledge to Ghostty. The C boundary supplies callbacks equivalent to:
 
 ```c
 typedef struct {
@@ -43,9 +43,9 @@ typedef struct {
 } ghostty_platform_opengl_s;
 ```
 
-`ghostty_surface_config_s` would gain an OpenGL platform tag and target. Ghostty
-would continue to own its renderer thread, atlas, shaders, terminal state, and
-PTY. Electron would own the platform surface, sizing, focus, input events, and
+`ghostty_surface_config_s` has an OpenGL platform tag and target. Ghostty owns
+its renderer thread, atlas, shaders, terminal state, and PTY or ConPTY.
+Electron owns the platform surface, sizing, focus, input events, and
 composition.
 
 For the final product, prefer a compositor texture path over child windows:
@@ -101,16 +101,15 @@ native responsibilities and must not travel through renderer-process DOM IPC.
 
 ## Rollout
 
-1. Prove macOS rendering, resize, typing, and scrolling with the native-handle
-   spike.
-2. Add complete macOS keyboard, IME, clipboard, mouse, action, and lifecycle
-   handling, then compare latency and memory with Swift cmux.
-3. Land the platform-neutral Ghostty render-target ABI and a headless renderer
-   conformance test.
-4. Implement Linux EGL and Windows ANGLE or D3D shared-texture targets.
-5. Add `GhosttyView` to the Electron fork and exercise the same JavaScript API
+1. The macOS native-handle demo proves Metal rendering, resize, typing,
+   selection, scrolling, clipboard, right-click actions, and lifecycle.
+2. The platform-neutral OpenGL ABI and native X11/GLX and HWND/WGL demos prove
+   Linux and Windows rendering, input, resize, and teardown.
+3. Implement Linux EGL or DMA-BUF and Windows ANGLE or D3D shared-texture
+   targets, plus hardware-GPU validation.
+4. Add `GhosttyView` to the Electron fork and exercise the same JavaScript API
    on all three operating systems.
-6. Rebuild one cmux workspace flow in Electron and measure startup, idle memory,
+5. Rebuild one cmux workspace flow in Electron and measure startup, idle memory,
    typing latency, resize behavior, IME, accessibility, and browser/terminal
    composition before deciding on the migration.
 
@@ -121,7 +120,7 @@ and Windows, terminal input stays out of renderer-process IPC, Chrome UI can
 animate and clip beside terminal layers without airspace artifacts, and typing
 latency remains within one display frame of native cmux under load.
 
-Until the render-target work lands, Electron can provide a macOS prototype or a
-cross-platform terminal based on `libghostty-vt` plus a web renderer. The latter
-does not preserve Ghostty's native renderer and should not be presented as the
-target architecture.
+The child-window demos preserve Ghostty's native renderer and establish
+feasibility. They do not satisfy the migration criteria because native child
+windows cannot participate fully in Chromium clipping, transforms, or overlay
+composition, and Linux still lacks Wayland support.
