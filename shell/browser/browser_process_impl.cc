@@ -181,8 +181,10 @@ void BrowserProcessImpl::RegisterPrefs(PrefRegistrySimple* registry) {
   registry->RegisterBooleanPref(prefs::kDevToolsRemoteDebuggingAllowed, true);
   registry->RegisterBooleanPref(prefs::kDevToolsRemoteDebuggingEnabled, false);
 
-#if BUILDFLAG(IS_LINUX) && BUILDFLAG(USE_DBUS)
+#if BUILDFLAG(IS_LINUX)
+#if BUILDFLAG(USE_DBUS)
   os_crypt_async::SecretPortalKeyProvider::RegisterLocalPrefs(registry);
+#endif
 #endif
 }
 #endif
