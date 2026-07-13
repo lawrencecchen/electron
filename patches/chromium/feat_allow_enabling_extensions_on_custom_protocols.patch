@@ -29,20 +29,20 @@ index ea484a282d820da78e8dc1db27ad0ba6e070ac2c..a0e361cf2d2960de4f429a9d37459e26
    URLPattern url_pattern(kAllowedSchemes);
    URLPattern::ParseResult result = url_pattern.Parse(pattern_str);
    if (result != URLPattern::ParseResult::kSuccess) {
-diff --git a/extensions/common/api/web_request/web_request_filter_constants.h b/extensions/common/api/web_request/web_request_filter_constants.h
-index 50152a60f3f328af19acdc6f28b2f8fedb7be0d5..35c37390481ecb133942879b7314ad5d47972c60 100644
---- a/extensions/common/api/web_request/web_request_filter_constants.h
-+++ b/extensions/common/api/web_request/web_request_filter_constants.h
-@@ -17,7 +17,8 @@ inline constexpr int kWebRequestFilterValidSchemes =
+diff --git a/extensions/common/api/web_request/web_request_filter.h b/extensions/common/api/web_request/web_request_filter.h
+index 2d8d386edcf063c45aaf619c72b081b45f1b5d11..10d1d58b4c7d45fb84506566e44f773ece012eca 100644
+--- a/extensions/common/api/web_request/web_request_filter.h
++++ b/extensions/common/api/web_request/web_request_filter.h
+@@ -26,7 +26,8 @@ inline constexpr int kWebRequestFilterValidSchemes =
      URLPattern::SCHEME_HTTP | URLPattern::SCHEME_HTTPS |
      URLPattern::SCHEME_FTP | URLPattern::SCHEME_FILE |
      URLPattern::SCHEME_EXTENSION | URLPattern::SCHEME_WS |
 -    URLPattern::SCHEME_WSS | URLPattern::SCHEME_UUID_IN_PACKAGE;
 +    URLPattern::SCHEME_WSS | URLPattern::SCHEME_UUID_IN_PACKAGE |
 +    URLPattern::SCHEME_ELECTRON_CUSTOM_PROTOCOLS;
- 
- // Request/response header names only delivered to webRequest listeners that
- // registered the "extraHeaders" option. Lowercase for case-insensitive
+
+ // Keys of the webRequest.RequestFilter dictionary.
+ inline constexpr char kRequestFilterUrlsKey[] = "urls";
 diff --git a/extensions/common/extension.cc b/extensions/common/extension.cc
 index 7e3abea6cb2d53165cb6d1457e9a331690e1497b..4aad9ee0cb31be9f9137864c0dcd4e12c20006c2 100644
 --- a/extensions/common/extension.cc
@@ -54,31 +54,40 @@ index 7e3abea6cb2d53165cb6d1457e9a331690e1497b..4aad9ee0cb31be9f9137864c0dcd4e12
 -    URLPattern::SCHEME_UUID_IN_PACKAGE;
 +    URLPattern::SCHEME_UUID_IN_PACKAGE |
 +    URLPattern::SCHEME_ELECTRON_CUSTOM_PROTOCOLS;
- 
+
  //
  // Extension
 diff --git a/extensions/common/url_pattern.cc b/extensions/common/url_pattern.cc
-index 1f733c4298e5812c98f900f1f070fbcea5334a94..d6e8002590c48584379d6b28f125583c218f0fd4 100644
+index 1f733c4298e5812c98f900f1f070fbcea5334a94..e607c59286d5d9d853ec700e9a2dc6e3fe4b0a33 100644
 --- a/extensions/common/url_pattern.cc
 +++ b/extensions/common/url_pattern.cc
 @@ -137,6 +137,11 @@ bool URLPattern::IsValidSchemeForExtensions(std::string_view scheme) {
        return true;
      }
    }
-+  for (auto& extension_scheme : url::GetExtensionSchemes()) {
++  for (const auto& extension_scheme : url::GetExtensionSchemes()) {
 +    if (scheme == extension_scheme) {
 +      return true;
 +    }
 +  }
    return false;
  }
- 
+
+@@ -146,7 +151,7 @@ int URLPattern::GetValidSchemeMaskForExtensions() {
+   for (int valid_scheme_mask : kValidSchemeMasks) {
+     result |= valid_scheme_mask;
+   }
+-  return result;
++  return result | SCHEME_ELECTRON_CUSTOM_PROTOCOLS;
+ }
+
+ URLPattern::URLPattern()
 @@ -398,6 +403,14 @@ bool URLPattern::IsValidScheme(std::string_view scheme) const {
      }
    }
- 
+
 +  if (valid_schemes_ & URLPattern::SCHEME_ELECTRON_CUSTOM_PROTOCOLS) {
-+    for (auto& extension_scheme : url::GetExtensionSchemes()) {
++    for (const auto& extension_scheme : url::GetExtensionSchemes()) {
 +      if (scheme == extension_scheme) {
 +        return true;
 +      }
@@ -87,7 +96,7 @@ index 1f733c4298e5812c98f900f1f070fbcea5334a94..d6e8002590c48584379d6b28f125583c
 +
    return false;
  }
- 
+
 diff --git a/extensions/common/url_pattern.h b/extensions/common/url_pattern.h
 index 4d09251b0160644d86682ad3db7c41b50f360e6f..8a626e14eff2d58d8218a7b0df820c6c0522b00f 100644
 --- a/extensions/common/url_pattern.h
@@ -95,7 +104,7 @@ index 4d09251b0160644d86682ad3db7c41b50f360e6f..8a626e14eff2d58d8218a7b0df820c6c
 @@ -64,6 +64,9 @@ class URLPattern {
      SCHEME_DATA = 1 << 9,
      SCHEME_UUID_IN_PACKAGE = 1 << 10,
- 
+
 +    // Represents the schemes returned by url::GetExtensionSchemes().
 +    SCHEME_ELECTRON_CUSTOM_PROTOCOLS = 1 << 11,
 +
@@ -114,7 +123,7 @@ index 672b6fe2fd92c7f83272549a1f2b44c29c5dc674..a72d3d6790ddf89cec6016aeef0c309c
 +                            URLPattern::SCHEME_UUID_IN_PACKAGE |
 +                            URLPattern::SCHEME_ELECTRON_CUSTOM_PROTOCOLS
  };
- 
+
  // static
 diff --git a/url/url_util.cc b/url/url_util.cc
 index f1f8ffe14fdac1156dce2502bff69e1d03eac2fc..d1bc847be05c1fb88c04dc936a5dbfc145a801ce 100644
@@ -123,17 +132,17 @@ index f1f8ffe14fdac1156dce2502bff69e1d03eac2fc..d1bc847be05c1fb88c04dc936a5dbfc1
 @@ -135,6 +135,9 @@ struct SchemeRegistry {
    // Embedder schemes that have V8 code cache enabled in js and wasm scripts.
    std::vector<std::string> code_cache_schemes = {};
- 
+
 +  // Embedder schemes on which Chrome extensions can be used.
 +  std::vector<std::string> extension_schemes = {};
 +
    // Schemes with a predefined default custom handler.
    std::vector<SchemeWithHandler> predefined_handler_schemes;
- 
+
 @@ -679,6 +682,15 @@ const std::vector<std::string>& GetCodeCacheSchemes() {
    return GetSchemeRegistry().code_cache_schemes;
  }
- 
+
 +void AddExtensionScheme(std::string_view new_scheme) {
 +  DoAddScheme(new_scheme,
 +              &GetSchemeRegistryWithoutLocking()->extension_schemes);
@@ -153,7 +162,7 @@ index 2647d26b25b26f570b40666ad2da3553b97d6088..88ed86392eb4e10a5b99267027371f3a
 @@ -124,6 +124,11 @@ COMPONENT_EXPORT(URL) const std::vector<std::string>& GetEmptyDocumentSchemes();
  COMPONENT_EXPORT(URL) void AddCodeCacheScheme(std::string_view new_scheme);
  COMPONENT_EXPORT(URL) const std::vector<std::string>& GetCodeCacheSchemes();
- 
+
 +// Adds an application-defined scheme to the list of schemes on which Chrome
 +// extensions can be used.
 +COMPONENT_EXPORT(URL) void AddExtensionScheme(std::string_view new_scheme);

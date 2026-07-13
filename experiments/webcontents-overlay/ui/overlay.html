@@ -1,0 +1,24 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="ui.css">
+  <title>Overlay</title>
+</head>
+<body class="overlay-body">
+  <main class="popover">
+    <header>
+      <div>
+        <span class="eyebrow">TOPMOST WEBCONTENTSVIEW</span>
+        <h1>Browser overlay</h1>
+      </div>
+      <button id="close" aria-label="Close">×</button>
+    </header>
+    <p>This independent Chromium surface overlaps both the omnibar and the page.</p>
+    <label>Overlay input <input id="overlay-input" value="Pointer and keyboard focus stay here"></label>
+    <div class="proof"><span></span> z-order and hit-testing active</div>
+  </main>
+  <script>document.querySelector('#close').addEventListener('click', window.demo.dismissOverlay)</script>
+</body>
+</html>

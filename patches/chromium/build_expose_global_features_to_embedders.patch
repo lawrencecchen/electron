@@ -1,0 +1,68 @@
+From 7357e65182464f907d0f15b4f23295d65180e829 Mon Sep 17 00:00:00 2001
+From: cmux-lawrence <cmux-lawrence@cmux-lawrences-Mac-mini.local>
+Date: Sat, 11 Jul 2026 18:58:14 -0700
+Subject: [PATCH] build: expose GlobalFeatures to embedders
+
+Patch-Dir: src/electron/patches/chromium
+Patch-Filename: build_expose_global_features_to_embedders.patch
+---
+ chrome/browser/BUILD.gn | 37 +++++++++++++++++++++++++++++++++++++
+ 1 file changed, 37 insertions(+)
+
+diff --git a/chrome/browser/BUILD.gn b/chrome/browser/BUILD.gn
+index 6c5ffeb7f7e7c..2d378ac128693 100644
+--- a/chrome/browser/BUILD.gn
++++ b/chrome/browser/BUILD.gn
+@@ -867,6 +867,16 @@ source_set("core") {
+     "universal_web_contents_observers.cc",
+   ]
+ 
++  if (enable_electron_chrome_profile_runtime) {
++    # Electron supplies its BrowserProcessImpl and links GlobalFeatures through
++    # the embeddable archive below. Keeping these implementations out of the
++    # Chrome core source set prevents duplicate process owners.
++    sources -= [
++      "browser_process_impl.cc",
++      "global_features.cc",
++    ]
++  }
++
+   configs += [
+     "//build/config/compiler:wexit_time_destructors",
+     "//build/config:precompiled_headers",
+@@ -1952,6 +1962,33 @@ source_set("core") {
+   }
+ }
+ 
++if (enable_electron_chrome_profile_runtime) {
++  # GlobalFeatures historically lives inside the //chrome/browser:core
++  # monolith. Electron needs the real GlobalFeatures and
++  # GlobalBrowserCollection ownership graph without Chrome's BrowserProcessImpl.
++  # Archiving the browser aggregation keeps the existing implementation
++  # dependencies while letting the final link extract only the objects
++  # reachable from global_features.cc.
++  static_library("global_features_embedder_impl") {
++    sources = [ "global_features.cc" ]
++    complete_static_lib = true
++    check_includes = false
++
++    configs += [
++      "//build/config/compiler:wexit_time_destructors",
++      "//build/config:precompiled_headers",
++    ]
++    defines = [ "ZLIB_CONST" ]
++
++    if (is_chrome_branded || use_official_enterprise_connectors_api_keys) {
++      defines += [ "USE_OFFICIAL_ENTERPRISE_CONNECTORS_API_KEYS=1" ]
++    }
++
++    public_deps = [ ":global_features" ]
++    deps = [ ":browser" ]
++  }
++}
++
+ # This target no longer has any sources of its own; it only aggregates
+ # dependencies. It must be a source_set (not a static_library) because an empty
+ # static_library produces an empty archive, which the Windows librarian
+-- 
+2.55.0.windows.2

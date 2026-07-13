@@ -1,0 +1,11 @@
+# Build Chromium's real `chrome` target without importing Electron's build
+# arguments. The resulting binary is the browser-side extension oracle used by
+# experiments/extensions-browser.
+is_debug = false
+is_component_build = false
+is_official_build = false
+symbol_level = 1
+blink_symbol_level = 0
+
+# Browser.getVersion must identify the source commit used for the oracle.
+use_dummy_lastchange = false

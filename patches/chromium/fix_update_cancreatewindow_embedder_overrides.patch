@@ -1,0 +1,84 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Lawrence Chen <lawrence@manaflow.com>
+Date: Mon, 13 Jul 2026 10:41:06 +0000
+Subject: fix: update CanCreateWindow embedder overrides
+
+
+diff --git a/android_webview/browser/aw_content_browser_client.cc b/android_webview/browser/aw_content_browser_client.cc
+index 26268a63e428385f93cdd38cf5c0bdd8d6fceb6e..eaa6bc0667d90beba0c560c051c824cc01f4adbb 100644
+--- a/android_webview/browser/aw_content_browser_client.cc
++++ b/android_webview/browser/aw_content_browser_client.cc
+@@ -614,6 +614,8 @@ bool AwContentBrowserClient::CanCreateWindow(
+     const std::string& frame_name,
+     WindowOpenDisposition disposition,
+     const blink::mojom::WindowFeatures& features,
++    const std::string& raw_features,
++    const scoped_refptr<network::ResourceRequestBody>& body,
+     bool user_gesture,
+     bool opener_suppressed,
+     bool* no_javascript_access) {
+diff --git a/android_webview/browser/aw_content_browser_client.h b/android_webview/browser/aw_content_browser_client.h
+index 12bf3844b347d70321066f5f88ccb95658fcc442..eda20afa4c0f4f950ab347a0baa5553021c2637c 100644
+--- a/android_webview/browser/aw_content_browser_client.h
++++ b/android_webview/browser/aw_content_browser_client.h
+@@ -125,6 +125,8 @@ class AwContentBrowserClient : public content::ContentBrowserClient {
+                        const std::string& frame_name,
+                        WindowOpenDisposition disposition,
+                        const blink::mojom::WindowFeatures& features,
++                       const std::string& raw_features,
++                       const scoped_refptr<network::ResourceRequestBody>& body,
+                        bool user_gesture,
+                        bool opener_suppressed,
+                        bool* no_javascript_access) override;
+diff --git a/chrome/browser/chrome_content_browser_client.cc b/chrome/browser/chrome_content_browser_client.cc
+index 76e1112d8c58308aa49d5225e3f91ae59fe98232..6c7ee1137b8846118e59bf2a32f5d49a62e0cb7e 100644
+--- a/chrome/browser/chrome_content_browser_client.cc
++++ b/chrome/browser/chrome_content_browser_client.cc
+@@ -4555,6 +4555,8 @@ bool ChromeContentBrowserClient::CanCreateWindow(
+     const std::string& frame_name,
+     WindowOpenDisposition disposition,
+     const blink::mojom::WindowFeatures& features,
++    const std::string& raw_features,
++    const scoped_refptr<network::ResourceRequestBody>& body,
+     bool user_gesture,
+     bool opener_suppressed,
+     bool* no_javascript_access) {
+diff --git a/chrome/browser/chrome_content_browser_client.h b/chrome/browser/chrome_content_browser_client.h
+index 78cfc1ef6515781b0846323fd6ab5ba1476459fb..f67e2bfb9aa0fff04bf667a4915cd5591d5da73d 100644
+--- a/chrome/browser/chrome_content_browser_client.h
++++ b/chrome/browser/chrome_content_browser_client.h
+@@ -528,6 +528,8 @@ class ChromeContentBrowserClient : public content::ContentBrowserClient {
+                        const std::string& frame_name,
+                        WindowOpenDisposition disposition,
+                        const blink::mojom::WindowFeatures& features,
++                       const std::string& raw_features,
++                       const scoped_refptr<network::ResourceRequestBody>& body,
+                        bool user_gesture,
+                        bool opener_suppressed,
+                        bool* no_javascript_access) override;
+diff --git a/chromecast/browser/cast_content_browser_client.cc b/chromecast/browser/cast_content_browser_client.cc
+index 42ae3ef4c5d7579d0fb062b9420d01ab5f630489..3450ad4e332bdc9229912715a3b553d06ae71960 100644
+--- a/chromecast/browser/cast_content_browser_client.cc
++++ b/chromecast/browser/cast_content_browser_client.cc
+@@ -630,6 +630,8 @@ bool CastContentBrowserClient::CanCreateWindow(
+     const std::string& frame_name,
+     WindowOpenDisposition disposition,
+     const blink::mojom::WindowFeatures& features,
++    const std::string& raw_features,
++    const scoped_refptr<network::ResourceRequestBody>& body,
+     bool user_gesture,
+     bool opener_suppressed,
+     bool* no_javascript_access) {
+diff --git a/chromecast/browser/cast_content_browser_client.h b/chromecast/browser/cast_content_browser_client.h
+index 6406ff3e0a3f8299c23c70db3b5395537bcb3954..ea6bd9427f6b61740336bdf1275b61325542a50d 100644
+--- a/chromecast/browser/cast_content_browser_client.h
++++ b/chromecast/browser/cast_content_browser_client.h
+@@ -213,6 +213,8 @@ class CastContentBrowserClient
+                        const std::string& frame_name,
+                        WindowOpenDisposition disposition,
+                        const blink::mojom::WindowFeatures& features,
++                       const std::string& raw_features,
++                       const scoped_refptr<network::ResourceRequestBody>& body,
+                        bool user_gesture,
+                        bool opener_suppressed,
+                        bool* no_javascript_access) override;

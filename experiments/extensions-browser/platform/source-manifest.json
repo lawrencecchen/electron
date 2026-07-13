@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "electronDeps": "../../DEPS",
+  "repository": "https://chromium.googlesource.com/chromium/src",
+  "targetPlatforms": [
+    "linux",
+    "mac",
+    "win"
+  ],
+  "roots": [
+    "extensions/common/api",
+    "chrome/common/extensions/api"
+  ],
+  "schemaExtensions": [
+    ".json",
+    ".idl",
+    ".webidl"
+  ],
+  "featureFiles": {
+    "api": "_api_features",
+    "manifest": "_manifest_features",
+    "permission": "_permission_features",
+    "behavior": "_behavior_features"
+  },
+  "snapshot": "chromium-contract.json",
+  "chromium": {
+    "version": "152.0.7948.0",
+    "revision": "be01f575fc46ad21782f736f7630a7ac0ddfbeb5",
+    "pinSource": "../../DEPS"
+  }
+}

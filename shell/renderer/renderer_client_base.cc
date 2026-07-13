@@ -90,6 +90,10 @@
 #endif  // BUILDFLAG(ENABLE_PRINTING)
 
 #if BUILDFLAG(ENABLE_ELECTRON_EXTENSIONS)
+#if BUILDFLAG(ENABLE_FULL_CHROME_EXTENSIONS)
+#include "chrome/common/extensions/chrome_extensions_client.h"
+#include "chrome/renderer/extensions/api/chrome_extensions_renderer_api_provider.h"
+#endif
 #include "base/strings/utf_string_conversions.h"
 #include "content/public/common/webplugininfo.h"
 #include "extensions/common/constants.h"
@@ -230,15 +234,24 @@ void RendererClientBase::RenderThreadStarted() {
                                                      true);
 
 #if BUILDFLAG(ENABLE_ELECTRON_EXTENSIONS)
+#if BUILDFLAG(ENABLE_FULL_CHROME_EXTENSIONS)
+  extensions_client_ = std::make_unique<extensions::ChromeExtensionsClient>();
+#else
   extensions_client_ = std::make_unique<ElectronExtensionsClient>();
+#endif
   extensions::ExtensionsClient::Set(extensions_client_.get());
 
   extensions_renderer_client_ =
       std::make_unique<ElectronExtensionsRendererClient>();
   extensions_renderer_client_->AddAPIProvider(
       std::make_unique<extensions::CoreExtensionsRendererAPIProvider>());
+#if BUILDFLAG(ENABLE_FULL_CHROME_EXTENSIONS)
+  extensions_renderer_client_->AddAPIProvider(
+      std::make_unique<extensions::ChromeExtensionsRendererAPIProvider>());
+#else
   extensions_renderer_client_->AddAPIProvider(
       std::make_unique<ElectronExtensionsRendererAPIProvider>());
+#endif
   extensions::ExtensionsRendererClient::Set(extensions_renderer_client_.get());
   extensions_renderer_client_->RenderThreadStarted();
 

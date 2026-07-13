@@ -1,0 +1,18 @@
+{
+  "name": "electron-libghostty-embed-spike",
+  "private": true,
+  "version": "0.0.1",
+  "description": "Spike: host a native libghostty surface beside Chromium UI",
+  "main": "main.js",
+  "scripts": {
+    "install": "node -e \"console.log('Run npm run build after setting GHOSTTY_XCFRAMEWORK')\"",
+    "build": "node-gyp rebuild --target=43.1.0 --dist-url=https://electronjs.org/headers",
+    "start": "electron .",
+    "stress": "electron . --stress",
+    "stress:cycles": "node scripts/stress-cycles.mjs"
+  },
+  "devDependencies": {
+    "electron": "43.1.0",
+    "node-gyp": "13.0.1"
+  }
+}

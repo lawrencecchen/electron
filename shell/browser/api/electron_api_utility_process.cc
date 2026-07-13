@@ -4,6 +4,8 @@
 
 #include "shell/browser/api/electron_api_utility_process.h"
 
+#include "electron/buildflags/buildflags.h"
+
 #include <map>
 #include <unordered_map>
 #include <utility>
@@ -30,7 +32,11 @@
 #include "shell/browser/electron_browser_context.h"
 #include "shell/browser/electron_child_process_host_flags.h"
 #include "shell/browser/javascript_environment.h"
+#if BUILDFLAG(ENABLE_FULL_CHROME_EXTENSIONS)
+#include "chrome/browser/net/system_network_context_manager.h"
+#else
 #include "shell/browser/net/system_network_context_manager.h"
+#endif
 #include "shell/common/gin_converters/callback_converter.h"
 #include "shell/common/gin_converters/file_path_converter.h"
 #include "shell/common/gin_helper/dictionary.h"

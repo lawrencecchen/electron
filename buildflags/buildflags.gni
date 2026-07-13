@@ -14,6 +14,11 @@ declare_args() {
   # Enable Chrome extensions support.
   enable_electron_extensions = true
 
+  # Compile the isolated Chrome extension browser lane. It rejects Electron
+  # BrowserContexts and exposes a command-line ProfileImpl bring-up probe while
+  # the Chrome global-service substrate is implemented.
+  enable_full_chrome_extensions = false
+
   # Enable Spellchecker support
   enable_builtin_spellchecker = true
 

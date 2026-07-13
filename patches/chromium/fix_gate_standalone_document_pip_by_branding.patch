@@ -1,0 +1,51 @@
+From 4434db8a2b26b497b329da911ac3fedfd808f587 Mon Sep 17 00:00:00 2001
+From: Lawrence Chen <lawrencecchen@users.noreply.github.com>
+Date: Mon, 13 Jul 2026 15:38:00 +0000
+Subject: [PATCH] fix: gate standalone document PiP by branding
+
+---
+ chrome/browser/ui/navigator/BUILD.gn             | 1 +
+ chrome/browser/ui/navigator/browser_navigator.cc | 5 ++++-
+ 2 files changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/chrome/browser/ui/navigator/BUILD.gn b/chrome/browser/ui/navigator/BUILD.gn
+index b2b345c7e4cee..b188fdcc36005 100644
+--- a/chrome/browser/ui/navigator/BUILD.gn
++++ b/chrome/browser/ui/navigator/BUILD.gn
+@@ -46,6 +46,7 @@ source_set("impl") {
+   deps = [
+     ":navigator",
+     "//base",
++    "//build:branding_buildflags",
+     "//chrome/browser:browser_about_handler",
+     "//chrome/browser:browser_public_dependencies",
+     "//chrome/browser:primitives",
+diff --git a/chrome/browser/ui/navigator/browser_navigator.cc b/chrome/browser/ui/navigator/browser_navigator.cc
+index 01a6ebd18a083..53a6c0d078755 100644
+--- a/chrome/browser/ui/navigator/browser_navigator.cc
++++ b/chrome/browser/ui/navigator/browser_navigator.cc
+@@ -18,6 +18,7 @@
+ #include "base/strings/utf_string_conversions.h"
+ #include "base/task/single_thread_task_runner.h"
+ #include "base/trace_event/trace_event.h"
++#include "build/branding_buildflags.h"
+ #include "build/build_config.h"
+ #include "chrome/browser/apps/app_service/web_contents_app_id_utils.h"
+ #include "chrome/browser/apps/link_capturing/link_capturing_tab_data.h"
+@@ -667,6 +668,7 @@ base::WeakPtr<content::NavigationHandle> NavigateImpl(
+     // DocumentPipHost-backed path instead of creating a Browser. The manager
+     // takes ownership of the child WebContents and shows the window itself, so
+     // Navigate() returns early without a Browser.
++#if BUILDFLAG(GOOGLE_CHROME_BRANDING)
+     if (base::FeatureList::IsEnabled(features::kDocumentPipStandaloneWindow)) {
+       std::optional<blink::mojom::PictureInPictureWindowOptions> pip_options =
+           contents_to_navigate_or_insert->GetPictureInPictureOptions();
+@@ -681,6 +683,7 @@ base::WeakPtr<content::NavigationHandle> NavigateImpl(
+       params->browser = nullptr;
+       return nullptr;
+     }
++#endif  // BUILDFLAG(GOOGLE_CHROME_BRANDING)
+-
++
+     PictureInPictureWindowManager::GetInstance()->EnterDocumentPictureInPicture(
+         params->source_contents, contents_to_navigate_or_insert);

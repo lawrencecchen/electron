@@ -1,0 +1,255 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Lawrence Chen <lawrencecchen@users.noreply.github.com>
+Date: Mon, 13 Jul 2026 13:03:56 +0000
+Subject: [PATCH] fix: restore Chrome file permissions in profile runtime
+
+---
+ chrome/browser/file_system_access/BUILD.gn    |  1 +
+ ...e_file_system_access_permission_context.cc | 44 +++++++++++++++----
+ chrome/browser/net/BUILD.gn                   |  8 ----
+ chrome/browser/net/proxy_config_monitor.cc    | 10 ++---
+ chrome/browser/net/proxy_config_monitor.h     |  5 ++-
+ 5 files changed, 45 insertions(+), 23 deletions(-)
+
+diff --git a/chrome/browser/file_system_access/BUILD.gn b/chrome/browser/file_system_access/BUILD.gn
+index 3256b774f9f9a..9e9e5cf0dd49c 100644
+--- a/chrome/browser/file_system_access/BUILD.gn
++++ b/chrome/browser/file_system_access/BUILD.gn
+@@ -54,6 +54,7 @@ source_set("impl") {
+     "//chrome/browser/safe_browsing",
+     "//chrome/browser/ui",
+     "//chrome/browser/ui/file_system_access",
++    "//chrome/common:buildflags",
+     "//components/content_settings/core/browser",
+     "//components/guest_view/buildflags",
+     "//components/pdf/common:util",
+diff --git a/chrome/browser/file_system_access/chrome_file_system_access_permission_context.cc b/chrome/browser/file_system_access/chrome_file_system_access_permission_context.cc
+index 876b301692617..b32f7d3512e9b 100644
+--- a/chrome/browser/file_system_access/chrome_file_system_access_permission_context.cc
++++ b/chrome/browser/file_system_access/chrome_file_system_access_permission_context.cc
+@@ -47,6 +47,7 @@
+ #include "chrome/browser/profiles/profile_manager.h"
+ #include "chrome/browser/ui/file_system_access/file_system_access_dialogs.h"
+ #include "chrome/browser/ui/file_system_access/file_system_access_restricted_directory_dialog.h"
++#include "chrome/common/buildflags.h"
+ #include "chrome/common/chrome_paths.h"
+ #include "chrome/grit/generated_resources.h"
+ #include "components/content_settings/core/browser/host_content_settings_map.h"
+@@ -87,7 +88,7 @@
+ #include "chrome/browser/ui/browser_window/public/browser_window_interface_iterator.h"  // nogncheck crbug.com/40147906
+ #include "chrome/browser/ui/tabs/public/tab_features.h"
+ #include "chrome/browser/ui/views/file_system_access/file_system_access_page_action_controller.h"
+-#if 0
++#if BUILDFLAG(ENABLE_ELECTRON_CHROME_PROFILE_RUNTIME)
+ #include "chrome/browser/web_applications/proto/web_app_install_state.pb.h"  // nogncheck
+ #include "chrome/browser/web_applications/web_app_install_manager.h"
+ #include "chrome/browser/web_applications/web_app_install_manager_observer.h"
+@@ -318,10 +319,12 @@ bool ShouldBlockAccessToPath(
+   DCHECK(path.IsAbsolute());
+ 
+   if (should_normalize_file_path) {
+-    path = NormalizeFilePath(path);
+-    profile_path = NormalizeFilePath(profile_path);
++    path = ChromeFileSystemAccessPermissionContext::NormalizeFilePath(path);
++    profile_path =
++        ChromeFileSystemAccessPermissionContext::NormalizeFilePath(profile_path);
+     for (auto& rule : extra_rules) {
+-      rule.path = NormalizeFilePath(rule.path);
++      rule.path =
++          ChromeFileSystemAccessPermissionContext::NormalizeFilePath(rule.path);
+     }
+   }
+ 
+@@ -334,6 +337,7 @@ bool ShouldBlockAccessToPath(
+ #endif
+ 
+   base::FilePath nearest_ancestor;
++  using BlockType = ChromeFileSystemAccessPermissionContext::BlockType;
+   BlockType nearest_ancestor_block_type = BlockType::kDontBlockChildren;
+   auto should_block_with_rule = [&](const base::FilePath& block_path,
+                                     BlockType block_type) -> bool {
+@@ -1288,7 +1292,7 @@ ChromeFileSystemAccessPermissionContext::
+ #if BUILDFLAG(IS_ANDROID)
+   one_time_permissions_tracker_.Observe(
+       OneTimePermissionsTrackerFactory::GetForBrowserContext(context));
+-#elif 0
++#elif BUILDFLAG(ENABLE_ELECTRON_CHROME_PROFILE_RUNTIME)
+   auto* provider = web_app::WebAppProvider::GetForWebApps(
+       Profile::FromBrowserContext(profile_));
+   if (provider) {
+@@ -2721,7 +2725,8 @@ void ChromeFileSystemAccessPermissionContext::OnShutdown() {
+   one_time_permissions_tracker_.Reset();
+ }
+ 
+-#if 0
++#if !BUILDFLAG(IS_ANDROID) && \
++    BUILDFLAG(ENABLE_ELECTRON_CHROME_PROFILE_RUNTIME)
+ void ChromeFileSystemAccessPermissionContext::OnWebAppInstalled(
+     const webapps::AppId& app_id) {
+   if (!base::FeatureList::IsEnabled(
+@@ -2821,6 +2826,20 @@ void ChromeFileSystemAccessPermissionContext::
+     OnWebAppInstallManagerDestroyed() {
+   install_manager_observation_.Reset();
+ }
++#elif !BUILDFLAG(IS_ANDROID)
++// The normal Electron lane keeps the Chrome observer interface in the shared
++// header, but does not own Chrome's WebAppProvider or install manager.
++void ChromeFileSystemAccessPermissionContext::OnWebAppInstalled(
++    const webapps::AppId&) {}
++
++void ChromeFileSystemAccessPermissionContext::OnWebAppInstalledWithOsHooks(
++    const webapps::AppId&) {}
++
++void ChromeFileSystemAccessPermissionContext::OnWebAppWillBeUninstalled(
++    const webapps::AppId&) {}
++
++void ChromeFileSystemAccessPermissionContext::
++    OnWebAppInstallManagerDestroyed() {}
+ #endif
+ 
+ void ChromeFileSystemAccessPermissionContext::NavigatedAwayFromOrigin(
+@@ -3079,7 +3098,11 @@ bool ChromeFileSystemAccessPermissionContext::
+         HandleType handle_type,
+         UserAction user_action,
+         GrantType grant_type) {
+-#elif 0
++#if BUILDFLAG(IS_ANDROID)
++  // TODO(crbug.com/40101963): Enable when Android persisted permissions are
++  // implemented.
++  return false;
++#elif BUILDFLAG(ENABLE_ELECTRON_CHROME_PROFILE_RUNTIME)
+   if (!base::FeatureList::IsEnabled(
+           features::kFileSystemAccessPersistentPermissions)) {
+     return false;
+@@ -3129,8 +3152,9 @@ bool ChromeFileSystemAccessPermissionContext::
+   }
+ 
+   return false;
+-#endif  // BUILDFLAG(IS_ANDROID)
++#else
+   return false;
++#endif
+ }
+ 
+ std::vector<FileRequestData> ChromeFileSystemAccessPermissionContext::
+@@ -3317,6 +3341,7 @@ bool ChromeFileSystemAccessPermissionContext::OriginHasExtendedPermission(
+     return false;
+   }
+ 
++#if BUILDFLAG(ENABLE_ELECTRON_CHROME_PROFILE_RUNTIME)
+   // If user has not set the extended permission preference, the extended
+   // permission state depends on whether the origin has an web app actively
+   // installed. First, check the cached value.
+@@ -3344,6 +3369,9 @@ bool ChromeFileSystemAccessPermissionContext::OriginHasExtendedPermission(
+                                             ? WebAppInstallStatus::kInstalled
+                                             : WebAppInstallStatus::kUninstalled;
+   return app_has_os_integration;
++#else
++  return false;
++#endif
+ #endif  // BUILDFLAG(IS_ANDROID)
+ }
+ 
+diff --git a/chrome/browser/net/BUILD.gn b/chrome/browser/net/BUILD.gn
+index 6f59698883a20..dc92146bb0d4e 100644
+--- a/chrome/browser/net/BUILD.gn
++++ b/chrome/browser/net/BUILD.gn
+@@ -26,10 +26,6 @@ proto_library("key_pinning_proto") {
+   ]
+ }
+ 
+-config("electron_chrome_profile_runtime") {
+-  defines = [ "ENABLE_ELECTRON_CHROME_PROFILE_RUNTIME" ]
+-}
+-
+ source_set("net") {
+   public = [
+     "cert_verifier_service_time_updater.h",
+@@ -93,10 +89,6 @@ source_set("net") {
+     "//url",
+   ]
+ 
+-  if (enable_electron_chrome_profile_runtime) {
+-    public_configs = [ ":electron_chrome_profile_runtime" ]
+-  }
+-
+   if (!is_android && !is_chromeos) {
+     public += [ "disk_cache_dir_policy_handler.h" ]
+   }
+diff --git a/chrome/browser/net/proxy_config_monitor.cc b/chrome/browser/net/proxy_config_monitor.cc
+index ab443a4f215bd..7d8a2750f0834 100644
+--- a/chrome/browser/net/proxy_config_monitor.cc
++++ b/chrome/browser/net/proxy_config_monitor.cc
+@@ -11,7 +11,7 @@
+ #include "build/chromeos_buildflags.h"
+ #include "chrome/browser/browser_process.h"
+ #include "chrome/browser/net/proxy_service_factory.h"
+-#if defined(ENABLE_ELECTRON_CHROME_PROFILE_RUNTIME)
++#if BUILDFLAG(ENABLE_ELECTRON_CHROME_PROFILE_RUNTIME)
+ #include "chrome/browser/policy/profile_policy_connector.h"
+ #include "chrome/browser/profiles/profile.h"
+ #endif
+@@ -25,13 +25,13 @@
+ #endif  // BUILDFLAG(IS_CHROMEOS)
+ 
+ #if BUILDFLAG(ENABLE_EXTENSIONS_CORE) && \
+-    defined(ENABLE_ELECTRON_CHROME_PROFILE_RUNTIME)
++    BUILDFLAG(ENABLE_ELECTRON_CHROME_PROFILE_RUNTIME)
+ #include "chrome/browser/extensions/api/proxy/proxy_api.h"
+ #endif
+ 
+ using content::BrowserThread;
+ 
+-#if defined(ENABLE_ELECTRON_CHROME_PROFILE_RUNTIME)
++#if BUILDFLAG(ENABLE_ELECTRON_CHROME_PROFILE_RUNTIME)
+ ProxyConfigMonitor::ProxyConfigMonitor(Profile* profile) {
+   DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
+   DCHECK(profile);
+@@ -142,7 +142,7 @@ void ProxyConfigMonitor::OnLazyProxyConfigPoll() {
+ void ProxyConfigMonitor::OnPACScriptError(int32_t line_number,
+                                           const std::string& details) {
+   DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
+-#if defined(ENABLE_ELECTRON_CHROME_PROFILE_RUNTIME)
++#if BUILDFLAG(ENABLE_ELECTRON_CHROME_PROFILE_RUNTIME)
+   extensions::ProxyEventRouter::GetInstance()->OnPACScriptError(
+       profile_, line_number, base::UTF8ToUTF16(details));
+ #endif
+@@ -160,7 +160,7 @@ void ProxyConfigMonitor::OnRequestMaybeFailedDueToProxySettings(
+     return;
+   }
+ 
+-#if defined(ENABLE_ELECTRON_CHROME_PROFILE_RUNTIME)
++#if BUILDFLAG(ENABLE_ELECTRON_CHROME_PROFILE_RUNTIME)
+   extensions::ProxyEventRouter::GetInstance()->OnProxyError(profile_,
+                                                             net_error);
+ #endif
+diff --git a/chrome/browser/net/proxy_config_monitor.h b/chrome/browser/net/proxy_config_monitor.h
+index 11c4d23207edb..2cfedf75f4856 100644
+--- a/chrome/browser/net/proxy_config_monitor.h
++++ b/chrome/browser/net/proxy_config_monitor.h
+@@ -10,6 +10,7 @@
+ 
+ #include "base/memory/raw_ptr.h"
+ #include "build/buildflag.h"
++#include "chrome/common/buildflags.h"
+ #include "extensions/buildflags/buildflags.h"
+ #include "mojo/public/cpp/bindings/receiver_set.h"
+ #include "mojo/public/cpp/bindings/remote_set.h"
+@@ -40,7 +41,7 @@ class ProxyConfigMonitor : public net::ProxyConfigService::Observer,
+ 
+ {
+  public:
+-#if defined(ENABLE_ELECTRON_CHROME_PROFILE_RUNTIME)
++#if BUILDFLAG(ENABLE_ELECTRON_CHROME_PROFILE_RUNTIME)
+   // Creates a ProxyConfigMonitor that gets proxy settings from |profile| and
+   // watches for changes. The created ProxyConfigMonitor must be destroyed
+   // before |profile|.
+@@ -95,7 +96,7 @@ class ProxyConfigMonitor : public net::ProxyConfigService::Observer,
+ 
+ #if BUILDFLAG(ENABLE_EXTENSIONS_CORE)
+   mojo::ReceiverSet<network::mojom::ProxyErrorClient> error_receiver_set_;
+-#if defined(ENABLE_ELECTRON_CHROME_PROFILE_RUNTIME)
++#if BUILDFLAG(ENABLE_ELECTRON_CHROME_PROFILE_RUNTIME)
+   raw_ptr<Profile> profile_ = nullptr;
+ #endif
+ #endif  // BUILDFLAG(ENABLE_EXTENSIONS_CORE)

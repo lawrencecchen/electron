@@ -14,6 +14,8 @@
 #include "base/functional/bind.h"
 #include "base/notimplemented.h"
 #include "base/path_service.h"
+#include "base/time/default_clock.h"
+#include "base/time/default_tick_clock.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/hid/hid_system_tray_icon.h"
 #include "chrome/browser/usb/usb_system_tray_icon.h"
@@ -45,13 +47,31 @@
 #include "shell/browser/net/resolve_proxy_helper.h"
 #include "shell/common/electron_constants.h"
 #include "shell/common/electron_paths.h"
+#include "shell/common/options_switches.h"
 #include "shell/common/thread_restrictions.h"
+
+#if BUILDFLAG(ENABLE_FULL_CHROME_EXTENSIONS)
+#include "chrome/browser/enterprise/browser_management/management_service_factory.h"
+#include "chrome/browser/global_features.h"
+#include "chrome/browser/policy/chrome_browser_policy_connector.h"
+#include "chrome/browser/prefs/browser_prefs.h"
+#include "chrome/browser/prefs/chrome_pref_service_factory.h"
+#include "chrome/browser/profiles/profile.h"
+#include "chrome/browser/profiles/profile_manager.h"
+#include "chrome/common/pref_names.h"
+#include "chrome/installer/util/google_update_settings.h"
+#include "components/language/core/browser/pref_names.h"
+#include "components/metrics/metrics_pref_names.h"
+#include "components/network_time/network_time_tracker.h"
+#include "components/policy/core/browser/browser_policy_connector.h"
+#endif
 
 #if BUILDFLAG(ENABLE_PRINTING)
 #include "chrome/browser/printing/print_job_manager.h"
 #endif
 
 #if BUILDFLAG(IS_LINUX)
+#include "build/config/linux/dbus/buildflags.h"
 #include "chrome/browser/browser_features.h"
 #include "components/os_crypt/async/browser/freedesktop_secret_key_provider.h"
 #include "components/os_crypt/async/browser/secret_portal_key_provider.h"
@@ -62,6 +82,9 @@
 
 #if BUILDFLAG(IS_WIN)
 #include "components/os_crypt/async/browser/dpapi_key_provider.h"
+#if BUILDFLAG(ENABLE_FULL_CHROME_EXTENSIONS)
+#include "chrome/browser/win/isolated_browser_support.h"
+#endif
 #endif
 
 #if BUILDFLAG(IS_MAC)
@@ -73,8 +96,29 @@
 #include "components/os_crypt/async/browser/posix_key_provider.h"
 #endif
 
-BrowserProcessImpl::BrowserProcessImpl() {
+BrowserProcessImpl::BrowserProcessImpl()
+#if BUILDFLAG(ENABLE_FULL_CHROME_EXTENSIONS)
+    : chrome_browser_policy_connector_(
+          std::make_unique<policy::ChromeBrowserPolicyConnector>()),
+      chrome_global_features_(GlobalFeatures::CreateGlobalFeatures())
+#endif
+{
+  CHECK(!g_browser_process);
   g_browser_process = this;
+
+#if BUILDFLAG(ENABLE_FULL_CHROME_EXTENSIONS)
+  CHECK(chrome_browser_policy_connector_);
+  CHECK(chrome_global_features_);
+  chrome_global_features_->Init();
+  chrome_network_time_tracker_ =
+      std::make_unique<network_time::NetworkTimeTracker>(
+          std::make_unique<base::DefaultClock>(),
+          std::make_unique<base::DefaultTickClock>(),
+          /*pref_service=*/nullptr,
+          /*url_loader_factory=*/nullptr,
+          /*fetch_behavior=*/std::nullopt);
+  CHECK(!chrome_network_time_tracker_->is_initialized());
+#endif
 }
 
 BrowserProcessImpl::~BrowserProcessImpl() {
@@ -116,14 +160,47 @@ void BrowserProcessImpl::ApplyProxyModeFromCommandLine(
   }
 }
 
+#if BUILDFLAG(ENABLE_FULL_CHROME_EXTENSIONS)
+// static
+void BrowserProcessImpl::RegisterPrefs(PrefRegistrySimple* registry) {
+  // Keep this list aligned with Chromium 152 BrowserProcessImpl::RegisterPrefs.
+  // RegisterLocalState() calls this symbol while building the real Chrome Local
+  // State used by ProfileImpl.
+  registry->RegisterBooleanPref(prefs::kDefaultBrowserSettingEnabled, false);
+  registry->RegisterBooleanPref(prefs::kAllowCrossOriginAuthPrompt, false);
+
+#if BUILDFLAG(IS_WIN)
+  registry->RegisterBooleanPref(prefs::kProcessIsolationEnabled,
+                                chrome::IsIsolationEnabled());
+#endif
+
+  registry->RegisterStringPref(language::prefs::kApplicationLocale,
+                               std::string());
+  registry->RegisterBooleanPref(metrics::prefs::kMetricsReportingEnabled,
+                                GoogleUpdateSettings::GetCollectStatsConsent());
+  registry->RegisterBooleanPref(prefs::kDevToolsRemoteDebuggingAllowed, true);
+  registry->RegisterBooleanPref(prefs::kDevToolsRemoteDebuggingEnabled, false);
+
+#if BUILDFLAG(IS_LINUX)
+#if BUILDFLAG(USE_DBUS)
+  os_crypt_async::SecretPortalKeyProvider::RegisterLocalPrefs(registry);
+#endif
+#endif
+}
+#endif
+
 BuildState* BrowserProcessImpl::GetBuildState() {
   NOTIMPLEMENTED();
   return nullptr;
 }
 
 GlobalFeatures* BrowserProcessImpl::GetFeatures() {
+#if BUILDFLAG(ENABLE_FULL_CHROME_EXTENSIONS)
+  return chrome_global_features_.get();
+#else
   NOTIMPLEMENTED();
   return nullptr;
+#endif
 }
 
 ui::UnownedUserDataHost& BrowserProcessImpl::GetUnownedUserDataHost() {
@@ -140,8 +217,14 @@ const ui::UnownedUserDataHost& BrowserProcessImpl::GetUnownedUserDataHost()
 }
 
 void BrowserProcessImpl::PostEarlyInitialization() {
-  PrefServiceFactory prefs_factory;
   auto pref_registry = base::MakeRefCounted<PrefRegistrySimple>();
+
+#if BUILDFLAG(ENABLE_FULL_CHROME_EXTENSIONS)
+  // ProfileImpl and Chrome's keyed services read a broad Local State contract.
+  // Use Chromium's generated registration list instead of adding preferences
+  // reactively as individual services crash.
+  RegisterLocalState(pref_registry.get());
+#else
   PrefProxyConfigTrackerImpl::RegisterPrefs(pref_registry.get());
   electron::ElectronMetricsServiceClient::RegisterMetricsPrefs(
       pref_registry.get());
@@ -154,15 +237,30 @@ void BrowserProcessImpl::PostEarlyInitialization() {
   os_crypt_async::SecretPortalKeyProvider::RegisterLocalPrefs(
       pref_registry.get());
 #endif
+#endif
 
   pref_registry->RegisterDictionaryPref(electron::kWindowStates);
 
   in_memory_pref_store_ = base::MakeRefCounted<ValueMapPrefStore>();
   ApplyProxyModeFromCommandLine(in_memory_pref_store());
+
+#if !BUILDFLAG(ENABLE_FULL_CHROME_EXTENSIONS)
+  PrefServiceFactory prefs_factory;
   prefs_factory.set_command_line_prefs(in_memory_pref_store());
+#endif
 
   base::FilePath prefs_path;
+#if BUILDFLAG(ENABLE_FULL_CHROME_EXTENSIONS)
+  const base::FilePath chrome_profile_path =
+      base::CommandLine::ForCurrentProcess()->GetSwitchValuePath(
+          electron::switches::kChromeProfileSmoke);
+  CHECK(!chrome_profile_path.empty() && chrome_profile_path.IsAbsolute())
+      << "--chrome-profile-smoke requires an absolute profile path";
+  chrome_profile_user_data_dir_ = chrome_profile_path.DirName();
+  prefs_path = chrome_profile_user_data_dir_;
+#else
   CHECK(base::PathService::Get(electron::DIR_SESSION_DATA, &prefs_path));
+#endif
   if (!base::DirectoryExists(prefs_path))
     base::CreateDirectory(prefs_path);
   prefs_path = prefs_path.Append(FILE_PATH_LITERAL("Local State"));
@@ -170,11 +268,27 @@ void BrowserProcessImpl::PostEarlyInitialization() {
   electron::ScopedAllowBlockingForElectron allow_blocking;
   scoped_refptr<JsonPrefStore> user_pref_store =
       base::MakeRefCounted<JsonPrefStore>(prefs_path);
-  user_pref_store->ReadPrefs();
+  const auto pref_read_error = user_pref_store->ReadPrefs();
+
+#if BUILDFLAG(ENABLE_FULL_CHROME_EXTENSIONS)
+  CHECK(chrome_browser_policy_connector_);
+  if (pref_read_error == JsonPrefStore::PREF_READ_ERROR_NONE) {
+    policy::ManagementServiceFactory::GetForPlatform()->UsePrefStoreAsCache(
+        user_pref_store);
+  }
+  local_state_ = chrome_prefs::CreateLocalState(
+      prefs_path, user_pref_store,
+      chrome_browser_policy_connector_->GetPolicyService(),
+      std::move(pref_registry), chrome_browser_policy_connector_.get());
+  chrome_browser_policy_connector_->MaybeApplyLocalTestPolicies(
+      local_state_.get());
+#else
+  static_cast<void>(pref_read_error);
   prefs_factory.set_user_prefs(user_pref_store);
   DCHECK(user_pref_store->IsInitializationComplete());
 
   local_state_ = prefs_factory.Create(std::move(pref_registry));
+#endif
 }
 
 void BrowserProcessImpl::PreCreateThreads() {
@@ -185,8 +299,13 @@ void BrowserProcessImpl::PreCreateThreads() {
   // Must be created before the IOThread.
   // Once IOThread class is no longer needed,
   // this can be created on first use.
+#if BUILDFLAG(ENABLE_FULL_CHROME_EXTENSIONS)
+  if (!SystemNetworkContextManager::HasInstance())
+    SystemNetworkContextManager::CreateInstance(local_state_.get());
+#else
   if (!SystemNetworkContextManager::GetInstance())
     SystemNetworkContextManager::CreateInstance(local_state_.get());
+#endif
 
   // Needs to be called here as per
   // https://source.chromium.org/chromium/chromium/src/+/main:chrome/browser/chrome_browser_main.cc;l=1385-1389;drc=c3bda003554dad21313fb24b7a4f3e1aae6102d9.
@@ -194,11 +313,62 @@ void BrowserProcessImpl::PreCreateThreads() {
 }
 
 void BrowserProcessImpl::PreMainMessageLoopRun() {
+#if BUILDFLAG(ENABLE_FULL_CHROME_EXTENSIONS)
+  // Chrome's network manager may request OSCrypt while the NetworkService is
+  // first created. Make the provider available before any call that can start
+  // that service.
+  CreateOSCryptAsync();
+  CreateNetworkQualityObserver();
+#else
   CreateNetworkQualityObserver();
   CreateOSCryptAsync();
+#endif
+
+#if BUILDFLAG(ENABLE_FULL_CHROME_EXTENSIONS)
+  CHECK(chrome_network_time_tracker_);
+  CHECK(!chrome_network_time_tracker_->is_initialized());
+  chrome_network_time_tracker_->Initialize(
+      local_state(),
+      system_network_context_manager()->GetSharedURLLoaderFactory());
+
+  CHECK(chrome_browser_policy_connector_);
+  chrome_browser_policy_connector_->Init(
+      local_state(),
+      system_network_context_manager()->GetSharedURLLoaderFactory());
+  chrome_browser_policy_connector_->InitCloudManagementController(
+      local_state(),
+      system_network_context_manager()->GetSharedURLLoaderFactory());
+  CHECK(chrome_browser_policy_connector_->GetPolicyService());
+  chrome_policy_initialized_ = true;
+#endif
+}
+
+void BrowserProcessImpl::OnResourceBundleCreated() {
+#if BUILDFLAG(ENABLE_FULL_CHROME_EXTENSIONS)
+  CHECK(chrome_browser_policy_connector_);
+  chrome_browser_policy_connector_->OnResourceBundleCreated();
+#endif
 }
 
 void BrowserProcessImpl::PostMainMessageLoopRun() {
+  is_shutting_down_ = true;
+
+#if BUILDFLAG(ENABLE_FULL_CHROME_EXTENSIONS)
+  CHECK(chrome_global_features_);
+  chrome_global_features_->PostMainMessageLoopRun();
+
+  // Profiles own BrowserContext keyed services and storage partitions. Tear
+  // them down while the UI thread, local state, and network service still
+  // exist, matching Chrome's BrowserProcessImpl ordering.
+  chrome_profile_manager_.reset();
+  LOG(INFO) << "Chrome profile smoke destroyed ProfileManager";
+
+  if (chrome_policy_initialized_) {
+    chrome_browser_policy_connector_->Shutdown();
+    chrome_policy_initialized_ = false;
+  }
+#endif
+
   if (local_state_)
     local_state_->CommitPendingWrite();
 
@@ -206,8 +376,17 @@ void BrowserProcessImpl::PostMainMessageLoopRun() {
   SystemNetworkContextManager::DeleteInstance();
 }
 
+void BrowserProcessImpl::PostDestroyThreads() {
+#if BUILDFLAG(ENABLE_FULL_CHROME_EXTENSIONS)
+  DCHECK(!chrome_profile_manager_);
+  CHECK(chrome_global_features_);
+  chrome_global_features_->PostDestroyThreads();
+  chrome_global_features_.reset();
+#endif
+}
+
 bool BrowserProcessImpl::IsShuttingDown() {
-  return false;
+  return is_shutting_down_;
 }
 
 metrics_services_manager::MetricsServicesManager*
@@ -221,8 +400,70 @@ metrics::MetricsService* BrowserProcessImpl::metrics_service() {
 }
 
 ProfileManager* BrowserProcessImpl::profile_manager() {
+#if BUILDFLAG(ENABLE_FULL_CHROME_EXTENSIONS)
+  return chrome_profile_manager_.get();
+#else
   return nullptr;
+#endif
 }
+
+#if BUILDFLAG(ENABLE_FULL_CHROME_EXTENSIONS)
+void BrowserProcessImpl::InitializeChromeProfileManager(
+    const base::FilePath& chrome_profile_path) {
+  DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
+  CHECK(!chrome_profile_path.empty());
+  CHECK(chrome_profile_path.IsAbsolute())
+      << "--chrome-profile-smoke requires an absolute profile path";
+  CHECK(!chrome_profile_manager_)
+      << "Chrome ProfileManager must have exactly one BrowserProcess owner";
+
+  // Chromium 152's ProfileManager contains a BrowserCollectionObserver whose
+  // constructor immediately observes GlobalBrowserCollection::GetInstance().
+  // Keep this invariant ahead of the constructor so a broken GN extraction or
+  // lifecycle regression cannot turn into a null dereference.
+  GlobalFeatures* features = GetFeatures();
+  CHECK(features && features->global_browser_collection())
+      << "Chrome profile runtime requires BrowserProcessImpl-owned, "
+         "initialized "
+         "Chromium GlobalFeatures and GlobalBrowserCollection before "
+         "constructing ProfileManager.";
+
+  CHECK_EQ(chrome_profile_path.DirName(), chrome_profile_user_data_dir_)
+      << "Chrome ProfileManager and Local State must share one user data root";
+  chrome_profile_manager_ =
+      std::make_unique<ProfileManager>(chrome_profile_user_data_dir_);
+  CHECK_EQ(chrome_profile_manager_->user_data_dir(),
+           chrome_profile_user_data_dir_);
+}
+
+Profile* BrowserProcessImpl::CreateChromeProfileForSmoke(
+    const base::FilePath& chrome_profile_path) {
+  DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
+  CHECK(chrome_profile_manager_);
+  CHECK_EQ(chrome_profile_path.DirName(), chrome_profile_user_data_dir_);
+  CHECK(local_state_);
+  CHECK(os_crypt_async_);
+  CHECK(SystemNetworkContextManager::GetInstance());
+  CHECK(!GetApplicationLocale().empty());
+
+  // ProfileImpl::LoadPrefsForNormalStartup() unconditionally dereferences the
+  // ChromeBrowserPolicyConnector to build its schema registry. Never replace
+  // this with a null policy service or a partial Profile adapter.
+  auto* connector = browser_policy_connector();
+  CHECK(chrome_policy_initialized_ && connector &&
+        connector->GetPolicyService())
+      << "Chrome ProfileImpl creation requires an initialized "
+         "ChromeBrowserPolicyConnector. It must be created before Local State "
+         "and initialized with Local State plus the system URL loader before "
+         "the smoke probe may call ProfileManager::GetProfile().";
+
+  Profile* profile = chrome_profile_manager_->GetProfile(chrome_profile_path);
+  CHECK(profile) << "Chromium failed to create the smoke ProfileImpl at "
+                 << chrome_profile_path;
+  CHECK_EQ(profile->GetPath(), chrome_profile_path);
+  return profile;
+}
+#endif
 
 PrefService* BrowserProcessImpl::local_state() {
   DCHECK(local_state_.get());
@@ -272,11 +513,19 @@ BrowserProcessImpl::GetOriginTrialsSettingsStorage() {
 
 policy::ChromeBrowserPolicyConnector*
 BrowserProcessImpl::browser_policy_connector() {
+#if BUILDFLAG(ENABLE_FULL_CHROME_EXTENSIONS)
+  return chrome_browser_policy_connector_.get();
+#else
   return nullptr;
+#endif
 }
 
 policy::PolicyService* BrowserProcessImpl::policy_service() {
+#if BUILDFLAG(ENABLE_FULL_CHROME_EXTENSIONS)
+  return chrome_browser_policy_connector_->GetPolicyService();
+#else
   return nullptr;
+#endif
 }
 
 IconManager* BrowserProcessImpl::icon_manager() {
@@ -349,7 +598,11 @@ WebRtcLogUploader* BrowserProcessImpl::webrtc_log_uploader() {
 }
 
 network_time::NetworkTimeTracker* BrowserProcessImpl::network_time_tracker() {
+#if BUILDFLAG(ENABLE_FULL_CHROME_EXTENSIONS)
+  return chrome_network_time_tracker_.get();
+#else
   return nullptr;
+#endif
 }
 
 gcm::GCMDriver* BrowserProcessImpl::gcm_driver() {

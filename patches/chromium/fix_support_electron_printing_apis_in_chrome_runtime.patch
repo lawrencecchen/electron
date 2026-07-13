@@ -1,0 +1,105 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Lawrence Chen <lawrencecchen@users.noreply.github.com>
+Date: Mon, 13 Jul 2026 09:14:07 +0000
+Subject: fix: support Electron printing APIs in Chrome runtime
+
+Electron adds UpdatePrintSettings to PrintManagerHost and disables Chrome enterprise print content analysis, but the full Chrome browser source set also builds headless and print-preview implementations that must match that surface. Implement the unsupported headless endpoint, use Chromium 152 current frame APIs, include the complete query queue type, and consistently disable the unsupported enterprise setter call sites. This is Electron-specific and cannot be upstreamed because upstream does not have the Electron UpdatePrintSettings Mojo method.
+
+diff --git a/chrome/browser/printing/print_view_manager.cc b/chrome/browser/printing/print_view_manager.cc
+index ce267d8107b633f758f6839345066b86ef28b2eb..c36e5974b69fb48b2f91347e2a3e74dacdfbf8d4 100644
+--- a/chrome/browser/printing/print_view_manager.cc
++++ b/chrome/browser/printing/print_view_manager.cc
+@@ -18,6 +18,7 @@
+ #include "build/build_config.h"
+ #include "chrome/browser/bad_message.h"
+ #include "chrome/browser/printing/print_preview_dialog_controller.h"
++#include "chrome/browser/printing/print_job_manager.h"
+ #include "chrome/browser/printing/printer_query.h"
+ #include "chrome/browser/profiles/profile.h"
+ #include "chrome/browser/ui/webui/print_preview/print_preview_ui.h"
+@@ -43,10 +44,6 @@
+ #include "chrome/browser/printing/oop_features.h"
+ #endif
+ 
+-#if BUILDFLAG(IS_WIN)
+-#include "chrome/browser/printing/print_job_manager.h"
+-#endif
+-
+ #if BUILDFLAG(IS_CHROMEOS)
+ #include "chrome/browser/chromeos/policy/dlp/dlp_content_manager.h"
+ #endif
+@@ -456,7 +453,7 @@ void PrintViewManager::GetPrintPreviewParams(
+ #endif
+ 
+   std::unique_ptr<PrinterQuery> query =
+-      queue()->CreatePrinterQuery(GetCurrentTargetFrame()->GetGlobalId());
++      queue()->CreatePrinterQuery(CurrentTargetFrame().GetGlobalId());
+   auto* query_ptr = query.get();
+   // We need to clone this before calling SetSettings because some environments
+   // evaluate job_settings.Clone() first, and some std::move(job_settings) first,
+@@ -560,7 +557,7 @@ void PrintViewManager::ShowScriptedPrintPreview() {
+     return;
+   }
+ 
+-#if BUILDFLAG(ENTERPRISE_CONTENT_ANALYSIS)
++#if 0  // Electron does not support Chrome enterprise print content analysis.
+   set_analyzing_content(/*analyzing=*/true);
+ #endif
+   RejectPrintPreviewRequestIfRestricted(
+@@ -573,7 +570,7 @@ void PrintViewManager::ShowScriptedPrintPreview() {
+ void PrintViewManager::OnScriptedPrintPreviewCallback(
+     content::GlobalRenderFrameHostId rfh_id,
+     bool should_proceed) {
+-#if BUILDFLAG(ENTERPRISE_CONTENT_ANALYSIS)
++#if 0  // Electron does not support Chrome enterprise print content analysis.
+   set_analyzing_content(/*analyzing=*/false);
+ #endif
+   if (!should_proceed) {
+@@ -619,7 +616,7 @@ void PrintViewManager::RequestPrintPreview(
+     return;
+   }
+ 
+-#if BUILDFLAG(ENTERPRISE_CONTENT_ANALYSIS)
++#if 0  // Electron does not support Chrome enterprise print content analysis.
+   set_analyzing_content(/*analyzing=*/true);
+ #endif
+   content::GlobalRenderFrameHostId id = CurrentTargetFrame().GetGlobalId();
+@@ -632,7 +629,7 @@ void PrintViewManager::OnRequestPrintPreviewCallback(
+     mojom::RequestPrintPreviewParamsPtr params,
+     content::GlobalRenderFrameHostId rfh_id,
+     bool should_proceed) {
+-#if BUILDFLAG(ENTERPRISE_CONTENT_ANALYSIS)
++#if 0  // Electron does not support Chrome enterprise print content analysis.
+   set_analyzing_content(/*analyzing=*/false);
+ #endif
+   if (!should_proceed) {
+diff --git a/components/printing/browser/headless/headless_print_manager.cc b/components/printing/browser/headless/headless_print_manager.cc
+index 72e93543ab29f4096957b458a1ec3580eaa487db..c713346fb627418b134d2cb441e8566165e3841c 100644
+--- a/components/printing/browser/headless/headless_print_manager.cc
++++ b/components/printing/browser/headless/headless_print_manager.cc
+@@ -72,6 +72,12 @@ void HeadlessPrintManager::GetPrintPreviewParams(
+   mojo::ReportBadMessage(kUnexpectedPrintManagerCall);
+ }
+ 
++void HeadlessPrintManager::UpdatePrintSettings(
++    base::DictValue job_settings,
++    UpdatePrintSettingsCallback callback) {
++  mojo::ReportBadMessage(kUnexpectedPrintManagerCall);
++}
++
+ void HeadlessPrintManager::SetupScriptedPrintPreview(
+     SetupScriptedPrintPreviewCallback callback) {
+   DLOG(ERROR) << "Scripted print preview is not supported";
+diff --git a/components/printing/browser/headless/headless_print_manager.h b/components/printing/browser/headless/headless_print_manager.h
+index 47b2871b4c0765f1028321f4235e3cf480c6dc85..8e3a51b300968bc32272798eea8e7e83c8abacad 100644
+--- a/components/printing/browser/headless/headless_print_manager.h
++++ b/components/printing/browser/headless/headless_print_manager.h
+@@ -53,6 +53,8 @@ class HeadlessPrintManager
+                      ScriptedPrintCallback callback) override;
+ #if BUILDFLAG(ENABLE_PRINT_PREVIEW)
+   void GetPrintPreviewParams(GetPrintPreviewParamsCallback callback) override;
++  void UpdatePrintSettings(base::DictValue job_settings,
++                           UpdatePrintSettingsCallback callback) override;
+   void SetupScriptedPrintPreview(
+       SetupScriptedPrintPreviewCallback callback) override;
+   void ShowScriptedPrintPreview() override;

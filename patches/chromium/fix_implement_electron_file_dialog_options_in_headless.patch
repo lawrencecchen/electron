@@ -1,0 +1,25 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Lawrence Chen <lawrencecchen@users.noreply.github.com>
+Date: Mon, 13 Jul 2026 10:57:55 +0000
+Subject: fix: implement Electron file dialog options in headless
+
+Electron adds Linux-only presentation options to SelectFileDialog. Chromium headless builds a cancel-only dialog directly from that base, so it must implement the added virtual surface even though no dialog is presented. No-op overrides preserve headless behavior and keep the Electron contract complete. This is Electron-specific because upstream Chromium does not expose these methods.
+
+diff --git a/components/headless/select_file_dialog/headless_select_file_dialog.cc b/components/headless/select_file_dialog/headless_select_file_dialog.cc
+index 23af76dec60b78e434ff5b7bdb8fddcb1ac6f99d..0e7b43c8d5d55e35fc21c9dac0a598172a8dd926 100644
+--- a/components/headless/select_file_dialog/headless_select_file_dialog.cc
++++ b/components/headless/select_file_dialog/headless_select_file_dialog.cc
+@@ -56,6 +56,13 @@ class HeadlessSelectFileDialog : public ui::SelectFileDialog {
+  private:
+   // ui::SelectFileDialog:
+   bool HasMultipleFileTypeChoicesImpl() override { return false; }
++#if BUILDFLAG(IS_LINUX)
++  // Headless dialogs always cancel and therefore ignore presentation options.
++  void SetButtonLabel(const std::string& label) override {}
++  void SetOverwriteConfirmationShown(bool is_shown) override {}
++  void SetHiddenShown(bool is_shown) override {}
++  void SetMultipleSelectionsAllowed(bool is_allowed) override {}
++#endif
+ 
+   SelectFileDialogCallback callback_;
+ };

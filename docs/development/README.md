@@ -17,6 +17,7 @@ For guides on Electron app development, see
   * [Windows](build-instructions-windows.md)
   * [Linux](build-instructions-linux.md)
 * [Chromium Development](chromium-development.md)
+* [Full Chrome Extension Platform](full-chrome-extension-platform.md)
 * [V8 Development](v8-development.md)
 * [Testing](testing.md)
 * [Debugging](debugging.md)
