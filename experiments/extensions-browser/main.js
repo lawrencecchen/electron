@@ -45,7 +45,7 @@ process.on('warning', (warning) => {
 
 const root = __dirname
 const extensionRoot = path.join(root, 'fixtures', 'extensions')
-const artifacts = path.join(root, 'artifacts')
+const defaultArtifacts = path.join(root, 'artifacts')
 const requiredAPI = require('./required-api.json')
 const platformContract = loadContract()
 const supportLedger = loadSupportLedger()
@@ -61,6 +61,9 @@ const integerArgument = (name, fallback) => {
 const stringArgument = (name, fallback) => (
   process.argv.find((argument) => argument.startsWith(`${name}=`))?.slice(name.length + 1) || fallback
 )
+const artifacts = stressMode
+  ? path.resolve(stringArgument('--stress-artifacts', defaultArtifacts))
+  : defaultArtifacts
 const stressIterations = integerArgument('--stress-iterations', 100)
 const stressReloadEvery = integerArgument('--stress-reload-every', 10)
 const stressCrashEvery = integerArgument('--stress-crash-every', 20)

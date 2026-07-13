@@ -10,20 +10,25 @@ const artifacts = path.join(root, 'artifacts')
 const electron = require('electron')
 const args = process.argv.slice(2)
 
-function integerOption(name, fallback) {
+function integerOption(name, fallback, minimum = 0) {
   const value = args.find((argument) => argument.startsWith(`${name}=`))?.split('=')[1]
   const parsed = Number.parseInt(value, 10)
-  return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback
+  return Number.isFinite(parsed) && parsed >= minimum ? parsed : fallback
 }
 
-const cycles = integerOption('--cycles', 5)
-const iterations = integerOption('--iterations', 50)
+const cycles = integerOption('--cycles', 5, 1)
+const iterations = integerOption('--iterations', 50, 1)
 const reloadEvery = integerOption('--reload-every', 5)
 const crashEvery = integerOption('--crash-every', 10)
-const timeoutMS = integerOption('--timeout-ms', 180_000)
+const timeoutMS = integerOption('--timeout-ms', 180_000, 1_000)
+const runID = `${new Date().toISOString().replaceAll(/[:.]/g, '-')}-${process.pid}`
+const runArtifacts = path.resolve(
+  args.find((argument) => argument.startsWith('--artifacts='))?.slice('--artifacts='.length) ||
+  path.join(artifacts, 'stress-runs', runID)
+)
 const profile = path.resolve(
   args.find((argument) => argument.startsWith('--profile='))?.slice('--profile='.length) ||
-  path.join(artifacts, 'stress-profile')
+  path.join(runArtifacts, 'profile')
 )
 
 function capture(stream, limit = 5 * 1024 * 1024) {
@@ -40,6 +45,16 @@ function capture(stream, limit = 5 * 1024 * 1024) {
 }
 
 async function runCycle(cycle) {
+  const reportPath = path.join(runArtifacts, `stress-${cycle}.json`)
+  const stdoutPath = path.join(runArtifacts, `stress-${cycle}.stdout.log`)
+  const stderrPath = path.join(runArtifacts, `stress-${cycle}.stderr.log`)
+  const progressPath = path.join(runArtifacts, `stress-${cycle}-progress.json`)
+  await Promise.all([
+    fs.rm(reportPath, { force: true }),
+    fs.rm(stdoutPath, { force: true }),
+    fs.rm(stderrPath, { force: true }),
+    fs.rm(progressPath, { force: true })
+  ])
   const startedAt = new Date().toISOString()
   const started = performance.now()
   const result = await new Promise((resolve) => {
@@ -50,6 +65,7 @@ async function runCycle(cycle) {
       `--stress-iterations=${iterations}`,
       `--stress-reload-every=${reloadEvery}`,
       `--stress-crash-every=${crashEvery}`,
+      `--stress-artifacts=${runArtifacts}`,
       `--stress-profile=${profile}`
     ], {
       cwd: root,
@@ -68,14 +84,14 @@ async function runCycle(cycle) {
   })
 
   await Promise.all([
-    fs.writeFile(path.join(artifacts, `stress-${cycle}.stdout.log`), Buffer.concat(result.stdout || [])),
-    fs.writeFile(path.join(artifacts, `stress-${cycle}.stderr.log`), Buffer.concat(result.stderr || []))
+    fs.writeFile(stdoutPath, Buffer.concat(result.stdout || [])),
+    fs.writeFile(stderrPath, Buffer.concat(result.stderr || []))
   ])
   delete result.stdout
   delete result.stderr
   let report
   try {
-    report = JSON.parse(await fs.readFile(path.join(artifacts, `stress-${cycle}.json`), 'utf8'))
+    report = JSON.parse(await fs.readFile(reportPath, 'utf8'))
   } catch (error) {
     result.reportError = error.message
   }
@@ -102,8 +118,8 @@ async function runCycle(cycle) {
 }
 
 await fs.mkdir(artifacts, { recursive: true })
+await fs.mkdir(runArtifacts, { recursive: true })
 await fs.rm(profile, { recursive: true, force: true })
-await fs.rm(path.join(artifacts, 'crashes'), { recursive: true, force: true })
 const results = []
 for (let cycle = 1; cycle <= cycles; cycle += 1) {
   const result = await runCycle(cycle)
@@ -114,6 +130,9 @@ for (let cycle = 1; cycle <= cycles; cycle += 1) {
 
 const summary = {
   electron,
+  runID,
+  runArtifacts,
+  profile,
   cyclesRequested: cycles,
   cyclesCompleted: results.length,
   iterationsPerCycle: iterations,
@@ -130,5 +149,9 @@ const summary = {
   results,
   pass: results.length === cycles && results.every((result) => result.pass)
 }
-await fs.writeFile(path.join(artifacts, 'stress-cycles.json'), `${JSON.stringify(summary, null, 2)}\n`)
+const serializedSummary = `${JSON.stringify(summary, null, 2)}\n`
+await Promise.all([
+  fs.writeFile(path.join(runArtifacts, 'stress-cycles.json'), serializedSummary),
+  fs.writeFile(path.join(artifacts, 'stress-cycles.json'), serializedSummary)
+])
 if (!summary.pass) process.exitCode = 1
