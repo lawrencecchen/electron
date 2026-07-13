@@ -1,0 +1,196 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Lawrence Chen <lawrencecchen@users.noreply.github.com>
+Date: Mon, 13 Jul 2026 12:43:30 +0000
+Subject: [PATCH] fix: restore profile-backed PDF spellcheck and titlebar
+ behavior
+
+---
+ chrome/browser/pdf/BUILD.gn                      |  1 +
+ chrome/browser/pdf/chrome_pdf_stream_delegate.cc |  5 +++--
+ chrome/browser/pdf/pdf_extension_util.cc         | 16 +++++++++++-----
+ chrome/browser/spellchecker/BUILD.gn             |  3 ++-
+ .../browser/spellchecker/spellcheck_service.cc   | 13 ++++++++-----
+ chrome/browser/win/BUILD.gn                      |  1 +
+ chrome/browser/win/titlebar_config.cc            |  3 ++-
+ 7 files changed, 28 insertions(+), 14 deletions(-)
+
+diff --git a/chrome/browser/pdf/BUILD.gn b/chrome/browser/pdf/BUILD.gn
+index 328369eb1e24c..2f6cb0179ed7f 100644
+--- a/chrome/browser/pdf/BUILD.gn
++++ b/chrome/browser/pdf/BUILD.gn
+@@ -40,6 +40,7 @@ source_set("pdf") {
+     "//chrome/browser/resources/pdf:resources",
+     "//chrome/browser/ui:browser_element_identifiers",
+     "//chrome/common",
++    "//chrome/common:buildflags",
+     "//components/pdf/browser:interceptors",
+     "//components/pdf/common:util",
+     "//components/prefs",
+diff --git a/chrome/browser/pdf/chrome_pdf_stream_delegate.cc b/chrome/browser/pdf/chrome_pdf_stream_delegate.cc
+index 1d7fa6c4a7956..aac220298abdb 100644
+--- a/chrome/browser/pdf/chrome_pdf_stream_delegate.cc
++++ b/chrome/browser/pdf/chrome_pdf_stream_delegate.cc
+@@ -15,6 +15,7 @@
+ #include "base/numerics/safe_conversions.h"
+ #include "chrome/browser/pdf/pdf_pref_names.h"
+ #include "chrome/browser/profiles/profile.h"
++#include "chrome/common/buildflags.h"
+ #include "chrome/grit/pdf_resources.h"
+ #include "components/pdf/browser/pdf_stream_delegate.h"
+ #include "components/prefs/pref_service.h"
+@@ -46,7 +47,7 @@ namespace {
+ // hierarchy is: enterprise policy > user choice > finch experiment.
+ bool ShouldEnableSkiaRenderer(content::WebContents* contents) {
+   CHECK(contents);
+-#if 0
++#if BUILDFLAG(ENABLE_ELECTRON_CHROME_PROFILE_RUNTIME)
+   const PrefService* prefs =
+       Profile::FromBrowserContext(contents->GetBrowserContext())->GetPrefs();
+ 
+@@ -66,7 +67,7 @@ bool ShouldEnableSkiaRenderer(content::WebContents* contents) {
+ // priority hierarchy is: enterprise policy > user choice > finch experiment.
+ bool ShouldEnableXfaForms(content::WebContents* contents) {
+   CHECK(contents);
+-#if 0
++#if BUILDFLAG(ENABLE_ELECTRON_CHROME_PROFILE_RUNTIME)
+   const PrefService* prefs =
+       Profile::FromBrowserContext(contents->GetBrowserContext())->GetPrefs();
+ 
+diff --git a/chrome/browser/pdf/pdf_extension_util.cc b/chrome/browser/pdf/pdf_extension_util.cc
+index dfdfd0fc5b438..a18c13829da52 100644
+--- a/chrome/browser/pdf/pdf_extension_util.cc
++++ b/chrome/browser/pdf/pdf_extension_util.cc
+@@ -16,6 +16,10 @@
+ #include "build/branding_buildflags.h"
+ #include "build/build_config.h"
+ #include "chrome/browser/browser_process.h"
++#include "chrome/common/buildflags.h"
++#if BUILDFLAG(ENABLE_ELECTRON_CHROME_PROFILE_RUNTIME)
++#include "chrome/browser/glic/public/glic_enabling.h"
++#endif
+ #include "chrome/common/chrome_features.h"
+ #include "chrome/common/extensions/api/pdf_viewer_private.h"
+ #include "chrome/common/url_constants.h"
+@@ -52,9 +56,10 @@
+ #include "components/prefs/pref_service.h"
+ #endif  // BUILDFLAG(ENABLE_PDF_INK2)
+ 
+-#if BUILDFLAG(ENABLE_PDF_INK2) || BUILDFLAG(ENABLE_PDF_SAVE_TO_DRIVE)
++#if BUILDFLAG(ENABLE_ELECTRON_CHROME_PROFILE_RUNTIME) || \
++    BUILDFLAG(ENABLE_PDF_INK2) || BUILDFLAG(ENABLE_PDF_SAVE_TO_DRIVE)
+ #include "chrome/browser/profiles/profile.h"
+-#endif  // BUILDFLAG(ENABLE_PDF_INK2) || BUILDFLAG(ENABLE_PDF_SAVE_TO_DRIVE)
++#endif
+ 
+ namespace pdf_extension_util {
+ 
+@@ -270,13 +275,14 @@ bool IsPrintingEnabled(content::BrowserContext* context) {
+ 
+ #if BUILDFLAG(ENABLE_PDF_INK2)
+ bool IsPdfAnnotationsEnabledByPolicy(content::BrowserContext* context) {
+-# if 0
++#if BUILDFLAG(ENABLE_ELECTRON_CHROME_PROFILE_RUNTIME)
+   PrefService* prefs =
+       context ? Profile::FromBrowserContext(context)->GetPrefs() : nullptr;
+   return !prefs || !prefs->IsManagedPreference(prefs::kPdfAnnotationsEnabled) ||
+          prefs->GetBoolean(prefs::kPdfAnnotationsEnabled);
+-#endif
++#else
+   return true;
++#endif
+ }
+ 
+ bool IsPdfInk2AnnotationsEnabled(content::BrowserContext* context) {
+@@ -491,7 +497,7 @@ bool ShouldShowGlicSummarizeButton(content::WebContents* web_contents) {
+     }
+   }
+ 
+-#if 0
++#if BUILDFLAG(ENABLE_ELECTRON_CHROME_PROFILE_RUNTIME)
+   Profile* profile =
+       Profile::FromBrowserContext(web_contents->GetBrowserContext());
+   if (!glic::GlicEnabling::IsEnabledForProfile(profile)) {
+diff --git a/chrome/browser/spellchecker/BUILD.gn b/chrome/browser/spellchecker/BUILD.gn
+index 33b1093fd7f68..89a1858e90c75 100644
+--- a/chrome/browser/spellchecker/BUILD.gn
++++ b/chrome/browser/spellchecker/BUILD.gn
+@@ -79,8 +79,9 @@ source_set("impl") {
+   deps = [
+     "//chrome/app/resources:locale_settings",
+     "//chrome/browser/profiles:profile",
+-    "//chrome/browser/search:search",
++    "//chrome/browser/search",
+     "//chrome/common",
++    "//chrome/common:buildflags",
+     "//components/language/core/browser",
+     "//components/policy:generated",
+     "//components/pref_registry",
+diff --git a/chrome/browser/spellchecker/spellcheck_service.cc b/chrome/browser/spellchecker/spellcheck_service.cc
+index eb92410b15a38..61a5e3bbabffa 100644
+--- a/chrome/browser/spellchecker/spellcheck_service.cc
++++ b/chrome/browser/spellchecker/spellcheck_service.cc
+@@ -21,7 +21,8 @@
+ #include "base/synchronization/waitable_event.h"
+ #include "base/values.h"
+ #include "build/build_config.h"
+-#if 0
++#include "chrome/common/buildflags.h"
++#if BUILDFLAG(ENABLE_ELECTRON_CHROME_PROFILE_RUNTIME)
+ #include "chrome/browser/profiles/profile.h"
+ #include "chrome/browser/profiles/profiles_state.h"
+ #endif
+@@ -73,10 +74,11 @@ SpellcheckService::SpellCheckerBinder& GetSpellCheckerBinderOverride() {
+ // Only record spelling-configuration metrics for profiles in which the user
+ // can configure spelling.
+ bool RecordSpellingConfigurationMetrics(content::BrowserContext* context) {
+-#if 0
++#if BUILDFLAG(ENABLE_ELECTRON_CHROME_PROFILE_RUNTIME)
+   return profiles::IsRegularUserProfile(Profile::FromBrowserContext(context));
+-#endif
++#else
+   return true;
++#endif
+ }
+ 
+ }  // namespace
+@@ -407,8 +409,9 @@ void SpellcheckService::InitForRenderer(content::RenderProcessHost* host) {
+       return;
+     }
+   }
+-#if 0
+-  if (base::FeatureList::IsEnabled(features::kInitialWebUIWithoutSpellCheckForNtp)) {
++#if BUILDFLAG(ENABLE_ELECTRON_CHROME_PROFILE_RUNTIME)
++  if (base::FeatureList::IsEnabled(
++          features::kInitialWebUIWithoutSpellCheckForNtp)) {
+     if (host->GetUserData(search::kIsNTPProcessKey)) {
+       return;
+     }
+diff --git a/chrome/browser/win/BUILD.gn b/chrome/browser/win/BUILD.gn
+index 586aa8fff1c0a..3f85317cce1cc 100644
+--- a/chrome/browser/win/BUILD.gn
++++ b/chrome/browser/win/BUILD.gn
+@@ -121,6 +121,7 @@ source_set("impl") {
+     "//chrome/chrome_elf:constants",
+     "//chrome/chrome_elf:dll_hash",
+     "//chrome/chrome_elf:third_party_shared_defines",
++    "//chrome/common:buildflags",
+     "//chrome/common:constants",
+     "//chrome/common:version_header",
+     "//chrome/install_static:install_static_util",
+diff --git a/chrome/browser/win/titlebar_config.cc b/chrome/browser/win/titlebar_config.cc
+index 114046912999f..ee7509084d379 100644
+--- a/chrome/browser/win/titlebar_config.cc
++++ b/chrome/browser/win/titlebar_config.cc
+@@ -9,10 +9,11 @@
+ #include "chrome/browser/ui/browser.h"
+ #include "chrome/browser/ui/views/frame/browser_view.h"
+ #include "chrome/browser/win/mica_titlebar.h"
++#include "chrome/common/buildflags.h"
+ 
+ bool ShouldBrowserCustomDrawTitlebar(BrowserView* browser_view) {
+   return !ShouldDefaultThemeUseMicaTitlebar() ||
+-#if 0
++#if BUILDFLAG(ENABLE_ELECTRON_CHROME_PROFILE_RUNTIME)
+          !ThemeServiceFactory::GetForProfile(browser_view->GetProfile())
+               ->UsingSystemTheme() ||
+ #endif
