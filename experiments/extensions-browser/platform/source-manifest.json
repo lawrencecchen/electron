@@ -24,8 +24,8 @@
   },
   "snapshot": "chromium-contract.json",
   "chromium": {
-    "version": "152.0.7947.0",
-    "revision": "18aeeb51dd7e909510d599bee93599bf91ef9ef9",
+    "version": "152.0.7948.0",
+    "revision": "be01f575fc46ad21782f736f7630a7ac0ddfbeb5",
     "pinSource": "../../DEPS"
   }
 }
