@@ -27,7 +27,6 @@ std::string LoadResourceBundle(const std::string& locale);
 class ElectronMainDelegate : public content::ContentMainDelegate {
  public:
   static const char* const kNonWildcardDomainNonPortSchemes[];
-  static const size_t kNonWildcardDomainNonPortSchemesSize;
   ElectronMainDelegate();
   ~ElectronMainDelegate() override;
 

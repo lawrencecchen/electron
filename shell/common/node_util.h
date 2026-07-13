@@ -10,7 +10,7 @@
 #include <vector>
 
 #include "base/containers/span.h"
-#include "base/memory/raw_ptr.h"
+#include "cppgc/persistent.h"
 #include "v8-microtask-queue.h"
 #include "v8/include/v8-forward.h"
 
@@ -90,7 +90,9 @@ class ExplicitMicrotasksScope {
   ExplicitMicrotasksScope& operator=(const ExplicitMicrotasksScope&) = delete;
 
  private:
-  base::raw_ptr<v8::MicrotaskQueue> microtask_queue_;
+  // V8 allocates MicrotaskQueue in cppgc. Keep it rooted for the lifetime of
+  // this scope so a checkpoint cannot collect it before the policy is restored.
+  cppgc::Persistent<v8::MicrotaskQueue> microtask_queue_;
   v8::MicrotasksPolicy original_policy_;
 };
 

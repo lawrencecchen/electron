@@ -898,6 +898,7 @@ source_set("electron_lib") {
         "//chrome/browser/profiles:profiles_extra_parts",
         "//chrome/browser/profiles:profiles_extra_parts_impl",
         "//chrome/common/extensions",
+        "//chrome/installer/util:with_no_strings",
         "//chrome/renderer/extensions",
         "//components/language/core/browser",
         "//components/metrics:metrics_pref_names",
