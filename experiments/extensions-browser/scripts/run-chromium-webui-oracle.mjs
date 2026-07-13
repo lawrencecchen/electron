@@ -63,7 +63,28 @@ export function parseBrowserRevision(value) {
   return revision
 }
 
-export function matchFixtures(fixtures, extensions) {
+export function fixtureLoadExpectation(fixture, chromiumVersion) {
+  const chromiumMajor = Number.parseInt(chromiumVersion.split('.')[0], 10)
+  if (fixture.manifestVersion === 2 && chromiumMajor >= 152) {
+    return {
+      reason: 'stock Chromium 152 and newer reject ordinary Manifest V2 extensions',
+      status: 'not-loaded'
+    }
+  }
+  return { reason: 'fixture uses a supported manifest generation', status: 'loaded' }
+}
+
+export function legacyMV2OverrideArguments(args) {
+  const featureNames = ['ExtensionManifestV2Disabled', 'ExtensionManifestV2Unsupported']
+  return args.filter((argument) => {
+    if (argument === '--allow-legacy-extension-manifests') return true
+    if (!argument.startsWith('--disable-features=')) return false
+    const disabledFeatures = argument.split('=', 2)[1].split(',')
+    return featureNames.some((feature) => disabledFeatures.includes(feature))
+  })
+}
+
+export function matchFixtures(fixtures, extensions, chromiumVersion) {
   return fixtures.map((fixture) => {
     const candidates = extensions.filter((extension) => {
       if (fixture.expectedId) return extension.id === fixture.expectedId
@@ -71,12 +92,17 @@ export function matchFixtures(fixtures, extensions) {
     })
     const status = candidates.length === 1 ? 'loaded' : candidates.length ? 'ambiguous' : 'not-loaded'
     const extension = candidates.length === 1 ? candidates[0] : undefined
+    const expectation = fixtureLoadExpectation(fixture, chromiumVersion)
     return {
       displayName: fixture.displayName,
       enabled: extension?.enabled,
+      expectedStatus: expectation.status,
+      expectationMet: status === expectation.status,
+      expectationReason: expectation.reason,
       id: extension?.id,
       installType: extension?.installType,
       label: fixture.label,
+      manifestVersion: fixture.manifestVersion,
       requested: true,
       status,
       type: extension?.type,
@@ -337,6 +363,10 @@ async function main() {
     console.log(usage())
     return
   }
+  const legacyMV2Overrides = legacyMV2OverrideArguments(options.chromeArgs)
+  if (legacyMV2Overrides.length) {
+    fail(`stock Chromium oracle rejects obsolete Manifest V2 override arguments: ${legacyMV2Overrides.join(', ')}`)
+  }
 
   const chromiumRoot = await resolveChromiumRoot(options.chromiumRoot)
   const outDir = path.resolve(chromiumRoot, options.outDir || path.join('out', 'ChromeOracle'))
@@ -421,7 +451,7 @@ async function main() {
       fail(`Chrome binary revision is ${actualRevision}; exact oracle requires ${expectedRevision}`)
     }
     const targetState = await waitForTargets(devtools.port, child, deadline)
-    const fixtureResults = matchFixtures(fixtures, targetState.report.extensions)
+    const fixtureResults = matchFixtures(fixtures, targetState.report.extensions, depsVersion)
     const requestedExtensions = [...fixtures, probe].map((extension) => ({
       displayName: extension.displayName,
       files: extension.tree.files,

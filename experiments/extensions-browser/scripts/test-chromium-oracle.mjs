@@ -4,6 +4,7 @@ import {
   canonicalJSONString,
   decodeProbeTitle,
   extensionIdFromKey,
+  legacyMV2OverrideArguments,
   matchFixtures,
   parseBrowserRevision,
   parseDevToolsActivePort
@@ -17,7 +18,7 @@ assert.deepEqual(parseDevToolsActivePort('43125\n/devtools/browser/example\n'), 
   port: 43125
 })
 assert.throws(() => parseDevToolsActivePort('0\n/devtools/browser/example\n'), /invalid port/)
-assert.equal(parseBrowserRevision('@c3d37161338e586b75ae8f9b3f8088be6c64c2d7'), 'c3d37161338e586b75ae8f9b3f8088be6c64c2d7')
+assert.equal(parseBrowserRevision('@204b1fd0d2d1ae8eac84fa6e3169e198b159d5d2'), '204b1fd0d2d1ae8eac84fa6e3169e198b159d5d2')
 assert.throws(() => parseBrowserRevision('@not-a-revision'), /invalid source revision/)
 
 const report = {
@@ -31,18 +32,41 @@ assert.equal(decodeProbeTitle('ORACLE_PENDING'), undefined)
 assert.deepEqual(matchFixtures([{
   displayName: 'Fixture',
   label: 'fixture',
+  manifestVersion: 3,
   version: '1.2.3'
-}], report.extensions), [{
+}], report.extensions, '152.0.7946.0'), [{
   displayName: 'Fixture',
   enabled: true,
+  expectedStatus: 'loaded',
+  expectationMet: true,
+  expectationReason: 'fixture uses a supported manifest generation',
   id: 'fixture-id',
   installType: undefined,
   label: 'fixture',
+  manifestVersion: 3,
   requested: true,
   status: 'loaded',
   type: undefined,
   version: '1.2.3'
 }])
+
+const mv2Result = matchFixtures([{
+  displayName: 'uBlock Origin',
+  label: 'ublock',
+  manifestVersion: 2,
+  version: '1.72.2'
+}], [], '152.0.7946.0')[0]
+assert.equal(mv2Result.status, 'not-loaded')
+assert.equal(mv2Result.expectedStatus, 'not-loaded')
+assert.equal(mv2Result.expectationMet, true)
+assert.deepEqual(legacyMV2OverrideArguments([
+  '--allow-legacy-extension-manifests',
+  '--disable-features=OtherFeature,ExtensionManifestV2Unsupported',
+  '--enable-features=Webium'
+]), [
+  '--allow-legacy-extension-manifests',
+  '--disable-features=OtherFeature,ExtensionManifestV2Unsupported'
+])
 
 assert.equal(canonicalJSONString({ z: 1, a: { y: 2, x: 3 } }), '{"a":{"x":3,"y":2},"z":1}')
 assert.equal(canonicalJSONString({ kept: true, omitted: undefined }), '{"kept":true}')

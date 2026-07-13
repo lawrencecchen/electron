@@ -18,6 +18,11 @@ npm start
 
 Run `npm run smoke` to navigate, display the overlay, capture all three views,
 and write `artifacts/smoke.json` plus PNG evidence.
+The Node launcher sets the smoke environment and resolves Electron without
+POSIX shell syntax, so the same command works on Linux, Windows, and macOS.
+Set `ELECTRON_BINARY` to exercise a fork build instead of the package binary.
+Use `npm run smoke -- --print-command` to verify launcher resolution without
+opening a window.
 
 Run `npm run stress` for 200 resize, navigation, focus, pointer, keyboard, and
 overlay z-order iterations. The harness force-crashes and recovers the content

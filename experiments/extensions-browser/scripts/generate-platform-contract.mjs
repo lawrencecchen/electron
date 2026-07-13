@@ -172,6 +172,8 @@ if (chromiumRoot) {
 const output = path.resolve(option('--output') || path.join(root, 'platform', sourceManifest.snapshot))
 await fs.mkdir(path.dirname(output), { recursive: true })
 await fs.writeFile(output, `${JSON.stringify(contract, null, 2)}\n`)
+const sourceManifestPath = path.join(root, 'platform', 'source-manifest.json')
+await fs.writeFile(sourceManifestPath, `${JSON.stringify(sourceManifest, null, 2)}\n`)
 if (args.includes('--reset-ledger')) {
   const ledger = {
     schemaVersion: 1,
@@ -183,4 +185,4 @@ if (args.includes('--reset-ledger')) {
   }
   await fs.writeFile(path.join(root, 'platform', 'support-ledger.json'), `${JSON.stringify(ledger, null, 2)}\n`)
 }
-console.log(JSON.stringify({ output, mode, chromium: contract.chromium, summary: contract.summary }, null, 2))
+console.log(JSON.stringify({ output, sourceManifest: sourceManifestPath, mode, chromium: contract.chromium, summary: contract.summary }, null, 2))

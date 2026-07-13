@@ -520,8 +520,7 @@ class WebContents final : public ExclusiveAccessContext,
       content::SessionStorageNamespace* session_storage_namespace) override;
   void WebContentsCreatedWithFullParams(
       content::WebContents* source_contents,
-      int opener_render_process_id,
-      int opener_render_frame_id,
+      const content::GlobalRenderFrameHostId& opener_id,
       const content::mojom::CreateNewWindowParams& params,
       content::WebContents* new_contents) override;
   void MaybeOverrideCreateParamsForNewWindow(

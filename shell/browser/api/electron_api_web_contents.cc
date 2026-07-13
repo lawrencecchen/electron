@@ -1307,8 +1307,7 @@ void WebContents::OnCreateWindow(
 
 void WebContents::WebContentsCreatedWithFullParams(
     content::WebContents* source_contents,
-    int opener_render_process_id,
-    int opener_render_frame_id,
+    const content::GlobalRenderFrameHostId& opener_id,
     const content::mojom::CreateNewWindowParams& params,
     content::WebContents* new_contents) {
   ChildWebContentsTracker::CreateForWebContents(new_contents);

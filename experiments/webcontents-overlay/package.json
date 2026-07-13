@@ -6,7 +6,7 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "smoke": "ELECTRON_OVERLAY_SMOKE=1 electron .",
+    "smoke": "node scripts/run-smoke.mjs",
     "stress": "electron . --stress",
     "stress:cycles": "node scripts/stress-cycles.mjs"
   },

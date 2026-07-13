@@ -5,8 +5,8 @@ Electron `DEPS`. It supplies the expected result for extension differential
 tests and a runnable reference for the Profile-backed Electron browser lane.
 It does not route Chrome APIs through `ElectronBrowserContext`.
 
-The current pin is Chromium 152.0.7945.0 at
-`c3d37161338e586b75ae8f9b3f8088be6c64c2d7`. The launcher fails when the
+The current pin is Chromium 152.0.7946.0 at
+`204b1fd0d2d1ae8eac84fa6e3169e198b159d5d2`. The launcher fails when the
 contract, `DEPS`, source checkout ancestry, or runtime binary version differs.
 
 ## Build
@@ -51,14 +51,16 @@ npm run oracle:webui:launch -- --chromium-root ../../..
 The launcher performs these checks before reporting ready:
 
 1. `DEPS`, the generated conformance contract, and the Chromium checkout share
-   version 152.0.7945.0 and its pinned base revision.
+   version 152.0.7946.0 and its pinned base revision.
 2. The runtime DevTools product reports that exact four-part version.
 3. A `chrome://webui-browser/` DevTools target proves that the
    `WebUIBrowserWindow` top chrome was created.
 4. A fixed-ID MV3 probe calls native `chrome.management.getAll`. Its report
-   records whether Chrome accepted each unmodified uBlock Origin and Bitwarden
-   fixture. Rejection remains a valid oracle outcome when stock Chromium no
-   longer supports a fixture's manifest or permission model.
+   records each fixture's manifest version, actual status, expected stock
+   status, and whether they match. Stock Chromium 152 rejects uBlock Origin
+   1.72.2 because it is Manifest V2; Bitwarden remains a normal load candidate.
+   The launcher rejects obsolete Manifest V2 override flags because they no
+   longer restore ordinary MV2 installation on this Chromium generation.
 
 The dedicated profile defaults to
 `artifacts/chromium-oracle-profile`. It is deleted before each run unless

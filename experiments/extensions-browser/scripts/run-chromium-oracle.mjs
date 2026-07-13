@@ -227,11 +227,9 @@ try {
     '--disable-background-networking',
     '--disable-component-update',
     '--disable-sync',
-    '--allow-legacy-extension-manifests',
     '--remote-debugging-port=0',
     `--disable-extensions-except=${extensionPaths.join(',')}`,
     `--load-extension=${extensionPaths.join(',')}`,
-    '--disable-features=ExtensionManifestV2Disabled,ExtensionManifestV2Unsupported',
     ...(noSandbox ? ['--no-sandbox'] : []),
     ...(headed ? [] : ['--headless=new']),
     `${collector.url}/page`

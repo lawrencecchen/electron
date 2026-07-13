@@ -22,5 +22,10 @@
     "permission": "_permission_features",
     "behavior": "_behavior_features"
   },
-  "snapshot": "chromium-contract.json"
+  "snapshot": "chromium-contract.json",
+  "chromium": {
+    "version": "152.0.7946.0",
+    "revision": "204b1fd0d2d1ae8eac84fa6e3169e198b159d5d2",
+    "pinSource": "../../DEPS"
+  }
 }

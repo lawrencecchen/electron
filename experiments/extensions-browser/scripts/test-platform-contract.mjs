@@ -8,6 +8,7 @@ const {
   evaluateCoverage,
   loadContract,
   loadElectronChromiumVersion,
+  loadSourceManifest,
   loadSupportLedger,
   parseJSONC,
   parseSchema
@@ -29,8 +30,10 @@ assert.deepEqual(parseSchema(webIDL, 'demo.webidl'), [{
 }])
 
 const contract = loadContract()
+const sourceManifest = loadSourceManifest()
 const ledger = loadSupportLedger()
 assert.equal(contract.chromium.version, loadElectronChromiumVersion())
+assert.deepEqual(sourceManifest.chromium, contract.chromium)
 assert.equal(ledger.chromiumRevision, contract.chromium.revision)
 assert.deepEqual(contract.summary, contractSummary(contract))
 assert.equal(new Set(contract.sources.map((source) => source.path)).size, contract.sources.length)

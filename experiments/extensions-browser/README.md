@@ -136,8 +136,11 @@ npm run oracle:webui:launch -- --chromium-root ../../..
 ```
 
 `npm run oracle:webui:smoke -- --chromium-root ../../..` exits after verifying
-the WebUI browser target, native extension registry, and unchanged uBlock and
-Bitwarden fixtures. It writes `artifacts/chromium-oracle-startup.json`. A
+the WebUI browser target and native extension registry, then records the load
+status of the unchanged uBlock and Bitwarden fixtures. Stock Chromium 152 is
+expected to reject uBlock Origin 1.72.2 because it is Manifest V2. The launcher
+rejects the obsolete MV2 feature switches rather than treating them as a way
+to restore uBlock. It writes `artifacts/chromium-oracle-startup.json`. A
 Chromium checkout with Electron patches is rejected unless
 `--allow-patched-source` is passed, and that override is marked ineligible as a
 stock oracle. See `../../docs/development/chromium-webui-oracle.md` for build and
