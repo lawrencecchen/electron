@@ -28,9 +28,10 @@ The extension artifacts come from the projects' official GitHub releases:
 
 `npm run smoke` writes API inventories, load warnings, popup screenshots,
 provider metadata, and the full Chrome denominator to
-`artifacts/compatibility.json`. Run `npm run platform:check` to write the
-expanded result to `artifacts/platform-coverage.json`. The strict form exits
-nonzero until every contract item has passing evidence:
+`artifacts/compatibility.json`. Run `npm run platform:check` to write an
+immutable result under `artifacts/platform-coverage-runs/` and refresh the
+platform-specific `artifacts/platform-coverage-<platform>.json` pointer. The
+strict form exits nonzero until every contract item has passing evidence:
 
 ```sh
 npm run platform:check:strict

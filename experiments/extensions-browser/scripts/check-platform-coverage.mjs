@@ -20,12 +20,22 @@ function option(name, fallback) {
 }
 
 const reportPath = path.resolve(option('--report', path.join(root, 'artifacts', 'compatibility.json')))
-const outputPath = path.resolve(option('--output', path.join(root, 'artifacts', 'platform-coverage.json')))
 const contract = loadContract()
 const ledger = loadSupportLedger()
 const sourceManifest = loadSourceManifest()
 const report = JSON.parse(await fs.readFile(reportPath, 'utf8'))
 const targetPlatform = option('--platform', report.platform)
+const outputArgument = option('--output')
+const runId = `${new Date().toISOString().replaceAll(/[:.]/g, '-')}-${process.pid}`
+const outputPath = path.resolve(outputArgument || path.join(
+  root,
+  'artifacts',
+  'platform-coverage-runs',
+  `${runId}-${targetPlatform}.json`
+))
+const latestPath = outputArgument
+  ? undefined
+  : path.join(root, 'artifacts', `platform-coverage-${targetPlatform}.json`)
 
 const structuralFailures = []
 if (contract.chromium.version !== loadElectronChromiumVersion()) structuralFailures.push('contract Chromium version differs from Electron DEPS')
@@ -39,10 +49,13 @@ const failures = [...structuralFailures, ...conformanceFailures(coverage)]
 coverage.failures = failures
 coverage.strictPass = failures.length === 0
 await fs.mkdir(path.dirname(outputPath), { recursive: true })
-await fs.writeFile(outputPath, `${JSON.stringify(coverage, null, 2)}\n`)
+const serializedCoverage = `${JSON.stringify(coverage, null, 2)}\n`
+await fs.writeFile(outputPath, serializedCoverage)
+if (latestPath) await fs.writeFile(latestPath, serializedCoverage)
 
 const summary = {
   output: outputPath,
+  latest: latestPath,
   provider: coverage.provider,
   contract: coverage.contract,
   evidence: Object.fromEntries(Object.entries(coverage.conformanceEvidence).map(([kind, value]) => [kind, {
