@@ -359,6 +359,7 @@ void BrowserProcessImpl::PostMainMessageLoopRun() {
   // them down while the UI thread, local state, and network service still
   // exist, matching Chrome's BrowserProcessImpl ordering.
   chrome_profile_manager_.reset();
+  LOG(INFO) << "Chrome profile smoke destroyed ProfileManager";
 
   if (chrome_policy_initialized_) {
     chrome_browser_policy_connector_->Shutdown();
