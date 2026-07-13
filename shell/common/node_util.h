@@ -10,8 +10,8 @@
 #include <vector>
 
 #include "base/containers/span.h"
-#include "cppgc/persistent.h"
 #include "v8-microtask-queue.h"
+#include "v8/include/cppgc/macros.h"
 #include "v8/include/v8-forward.h"
 
 namespace node {
@@ -82,6 +82,8 @@ v8::Local<v8::Object> CreateAbortController(v8::Isolate* isolate);
 // `kExplicit` while the scope is active, then restores the original policy
 // when it's destroyed.
 class ExplicitMicrotasksScope {
+  CPPGC_STACK_ALLOCATED();
+
  public:
   explicit ExplicitMicrotasksScope(v8::MicrotaskQueue* queue);
   ~ExplicitMicrotasksScope();
@@ -90,9 +92,7 @@ class ExplicitMicrotasksScope {
   ExplicitMicrotasksScope& operator=(const ExplicitMicrotasksScope&) = delete;
 
  private:
-  // V8 allocates MicrotaskQueue in cppgc. Keep it rooted for the lifetime of
-  // this scope so a checkpoint cannot collect it before the policy is restored.
-  cppgc::Persistent<v8::MicrotaskQueue> microtask_queue_;
+  v8::MicrotaskQueue* microtask_queue_;
   v8::MicrotasksPolicy original_policy_;
 };
 
